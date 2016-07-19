@@ -1,0 +1,6 @@
+LIBRARY Intrinsics
+
+EXPORTS
+    RdTsc=RdTscWrapper
+    CpuId=CpuIdWrapper
+    CpuIdEx=CpuIdExWrapper
