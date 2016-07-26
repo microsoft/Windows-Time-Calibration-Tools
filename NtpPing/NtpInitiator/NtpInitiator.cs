@@ -52,10 +52,19 @@ namespace Microsoft.TimeCalibration.Ntp
         public ulong RdTscEnd;
     }
 
+    internal static class SafeNativeMethods
+    {
+        [DllImport("kernel32.dll")]
+        public static extern void GetSystemTimePreciseAsFileTime(out FILETIME lpSystemTimeAsFileTime);
+
+        [DllImport("Intrinsics.dll")]
+        public  static extern ulong RdTsc();
+    }
+
     /// <summary>
     /// Class that initiates an NTP exchange
     /// </summary>
-    public class NtpInitiator
+    public class NtpInitiator : IDisposable
     {
         #region Private State
         private uint Period;
@@ -192,11 +201,6 @@ namespace Microsoft.TimeCalibration.Ntp
         #endregion
 
         #region Time handling
-        [DllImport("kernel32.dll")]
-        static extern void GetSystemTimePreciseAsFileTime(out FILETIME lpSystemTimeAsFileTime);
-
-        [DllImport("Intrinsics.dll")]
-        static extern ulong RdTsc();
 
         /// <summary>
         /// Query the underlying OS to retrieve the current system file time
@@ -208,7 +212,7 @@ namespace Microsoft.TimeCalibration.Ntp
             ulong now;
 
             // Get the time as a FILETIME
-            GetSystemTimePreciseAsFileTime(out fileTimeNow);
+            SafeNativeMethods.GetSystemTimePreciseAsFileTime(out fileTimeNow);
 
             // Unpack filetime
             now = (uint)fileTimeNow.dwHighDateTime;
@@ -304,7 +308,7 @@ namespace Microsoft.TimeCalibration.Ntp
         private void SendCallback(object state)
         {
             byte[] Packet = BuildNtpClientPacket(FileTimeToNtpTimeStamp(GetSystemTimeAsFileTimeUlong()));
-            LastRdTscSend = RdTsc();
+            LastRdTscSend = SafeNativeMethods.RdTsc();
             Client.Send(Packet, Packet.Length);
             if (Running)
             {
@@ -318,7 +322,7 @@ namespace Microsoft.TimeCalibration.Ntp
         /// <param name="state">Unused</param>
         private void ReceiveCallback(IAsyncResult ar)
         {
-            LastRdTscReceive = RdTsc();
+            LastRdTscReceive = SafeNativeMethods.RdTsc();
             try
             {
                 IPEndPoint remoteEp = null;
@@ -563,6 +567,44 @@ namespace Microsoft.TimeCalibration.Ntp
                 return Samples.ToArray();
             }
         }
+
         #endregion
+
+        #region IDisposable Support
+        private bool disposedValue = false; // To detect redundant calls
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposedValue)
+            {
+                if (disposing)
+                {
+                    Client.Close();
+                    SendTimer.Dispose();
+                }
+
+                // TODO: free unmanaged resources (unmanaged objects) and override a finalizer below.
+                // TODO: set large fields to null.
+
+                disposedValue = true;
+            }
+        }
+
+        // TODO: override a finalizer only if Dispose(bool disposing) above has code to free unmanaged resources.
+        // ~NtpInitiator() {
+        //   // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
+        //   Dispose(false);
+        // }
+
+        // This code added to correctly implement the disposable pattern.
+        public void Dispose()
+        {
+            // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
+            Dispose(true);
+            // TODO: uncomment the following line if the finalizer is overridden above.
+            // GC.SuppressFinalize(this);
+        }
+        #endregion
+
     }
 }
