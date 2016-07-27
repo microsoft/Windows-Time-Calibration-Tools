@@ -1,5 +1,7 @@
-<<<<<<< HEAD
-*.suo
 =======
 *.suo
->>>>>>> refs/remotes/Microsoft/master
+**/bin
+**/obj
+**/x64
+**/x86
+*.db
