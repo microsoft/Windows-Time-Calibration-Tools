@@ -78,6 +78,13 @@ namespace NtpMonitoringService
                 {
                     Sampler sample = new Sampler();
                     sample.Name = server;
+                    string interval = (string)key.GetValue(server);
+
+                    if (interval.Length == 0)
+                    {
+                        interval = "1000";
+                    }
+
 
                     if (sample.Name == "localhost")
                     {
@@ -85,7 +92,7 @@ namespace NtpMonitoringService
                     }
                     else
                     {
-                        sample.StartInfo = new ProcessStartInfo("NtpSampler.exe", sample.Name + " 1000 3600");
+                        sample.StartInfo = new ProcessStartInfo("NtpSampler.exe", sample.Name + " " + interval + " 3600");
                     }
 
                     sample.StartInfo.CreateNoWindow = true;
