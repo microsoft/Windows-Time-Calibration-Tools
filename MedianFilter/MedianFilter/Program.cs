@@ -44,7 +44,7 @@ namespace Microsoft.TimeCalibration.MedianFilter
                 if (medianValues.Count == depth)
                 {
                     double median = GetMedianValue(medianValues);
-                    Console.WriteLine(line + median);
+                    Console.WriteLine(line + "," + median);
                 }
             }
         }

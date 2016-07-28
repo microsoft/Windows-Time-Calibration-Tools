@@ -29,6 +29,8 @@ namespace Microsoft.TimeCalibration.TimeSampleCorrelation
         struct Sample
         {
             public long tsc;
+            public long tscStart;
+            public long tscEnd;
             public long timeStamp;
         };
 
@@ -108,6 +110,8 @@ namespace Microsoft.TimeCalibration.TimeSampleCorrelation
 
                 // Average start and end
                 sample.tsc = (tscEnd + tscStart) / 2;
+                sample.tscStart = tscStart;
+                sample.tscEnd = tscEnd;
 
                 samples.Add(sample);
             }
@@ -228,6 +232,7 @@ namespace Microsoft.TimeCalibration.TimeSampleCorrelation
             {
                 // Gather a spread of 5 samples around the point to evaluate
                 double skew;
+                double rtt;
                 if (!FindSamples(rootSamples[i].tsc, guestSamples, ref interopData))
                 {
                     continue;
@@ -240,13 +245,14 @@ namespace Microsoft.TimeCalibration.TimeSampleCorrelation
 
                 // Interpolate the guest time at the root tsc timestamp.
                 skew = Interpolate(interopData, rootSamples[i].tsc) - rootSamples[i].timeStamp;
+                rtt = Interpolate(interopData, rootSamples[i].tscEnd) - Interpolate(interopData, rootSamples[i].tscStart);
 
                 // Convert time stamp to human readable form.
                 DateTime date = DateTime.FromFileTime(rootSamples[i].timeStamp);
 
                 // Print date, skew (in us units)
                 Console.Write(date.ToString() + ",");
-                Console.Write((Math.Round(skew) / 10).ToString() + ",");
+                Console.Write((Math.Round(skew) / 10).ToString() + "," + (Math.Round(rtt) / 10).ToString());
                 Console.WriteLine();
             }
         }
