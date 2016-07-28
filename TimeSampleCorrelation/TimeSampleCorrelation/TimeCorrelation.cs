@@ -77,7 +77,7 @@ namespace Microsoft.TimeCalibration.TimeSampleCorrelation
         /// <returns>List of samples</returns>
         static List<Sample> ReadSamples(string FileName, long delta, int StartingColumn)
         {
-            StreamReader timeStamps = new StreamReader(File.Open(FileName, FileMode.Open));
+            StreamReader timeStamps = new StreamReader(File.Open(FileName, FileMode.Open, FileAccess.Read, FileShare.Read));
             List<Sample> samples = new List<Sample>();
             while (!timeStamps.EndOfStream)
             {
