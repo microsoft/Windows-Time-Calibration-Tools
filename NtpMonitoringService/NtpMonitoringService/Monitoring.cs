@@ -31,27 +31,31 @@ namespace NtpMonitoringService
         Dictionary<NtpServer, Task> RunningTasks = new Dictionary<NtpServer, Task>();
         System.Threading.Timer ConfigRefresh;
         private object writeLock = new Object();
+        private string ConfiguredServiceName;
 
-        public Monitoring()
+        public Monitoring(string [] Argv)
         {
             InitializeComponent();
-
-            string keyName = "SYSTEM\\CurrentControlSet\\Services\\" + ServiceName + "\\Config";
-            Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(keyName);
-
-            ChildCount = 0;
-            Output = null;
-            Hour = -1;
-
-            BaseFileName = key.GetValue("BasePath").ToString() + "\\" + Guid.NewGuid().ToString() + ".";
-            Shutdown = new System.Threading.ManualResetEvent(false);
-            
+            if (Argv.Length > 0)
+            {
+                ConfiguredServiceName = Argv[0];
+            }
+            else
+            {
+                ConfiguredServiceName = ServiceName;
+            }
         }
 
         protected void UpdateServerList()
         {
-            string keyName = "SYSTEM\\CurrentControlSet\\Services\\" + ServiceName + "\\Servers";
+            string keyName = "SYSTEM\\CurrentControlSet\\Services\\" + ConfiguredServiceName + "\\Servers";
             Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(keyName);
+            if (key == null)
+            {
+                EventLog.WriteEntry("Missing configuration subkey:" + keyName);
+                Stop();
+                return;
+            }
             NtpServer[] servers = ResolveServerNames(key.GetValueNames());
             List<NtpServer> removedServers = new List<NtpServer>();
             List<NtpServer> addedServers = new List<NtpServer>();
@@ -84,15 +88,16 @@ namespace NtpMonitoringService
                 foreach (NtpServer server in addedServers)
                 {
                     string interval = (string)key.GetValue(server.ConfiguredName);
+                    if (interval == null || interval.Length == 0) 
+                    {
+                        interval = "5000";
+                    }
 
                     EventLog.WriteEntry("Monitoring NTP server: " + server.ConfiguredName + " IPAddress: " + server.Address.ToString());
 
                     Sampler sample = new Sampler();
                     sample.Server = server;
 
-                    sample.StartInfo.CreateNoWindow = true;
-                    sample.StartInfo.RedirectStandardOutput = true;
-                    sample.StartInfo.UseShellExecute = false;
 
                     if (server.ConfiguredName == "localhost")
                     {
@@ -102,6 +107,10 @@ namespace NtpMonitoringService
                     {
                         sample.StartInfo = new ProcessStartInfo("NtpSampler.exe", server.Address.ToString() + " " + interval + " 3600");
                     }
+
+                    sample.StartInfo.CreateNoWindow = true;
+                    sample.StartInfo.RedirectStandardOutput = true;
+                    sample.StartInfo.UseShellExecute = false;
                     sample.Child = Process.Start(sample.StartInfo);
                     System.Threading.Interlocked.Increment(ref ChildCount);
                     RunningTasks.Add(server, ReadSampler(sample));
@@ -116,6 +125,22 @@ namespace NtpMonitoringService
 
         protected override void OnStart(string[] args)
         {
+            string keyName = "SYSTEM\\CurrentControlSet\\Services\\" + ConfiguredServiceName + "\\Config";
+            Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(keyName);
+            if (key == null)
+            {
+                EventLog.WriteEntry("Missing configuration subkey: " + keyName);
+                Stop();
+                return;
+            }
+
+            ChildCount = 0;
+            Output = null;
+            Hour = -1;
+
+            BaseFileName = key.GetValue("BasePath").ToString() + "\\" + Guid.NewGuid().ToString() + ".";
+            Shutdown = new System.Threading.ManualResetEvent(false);
+
             ConfigRefresh = new System.Threading.Timer((object o) => { UpdateServerList(); });
             ConfigRefresh.Change(0, 60000);
         }
@@ -139,8 +164,11 @@ namespace NtpMonitoringService
             {
                 task.Wait();
             }
-            Output.Flush();
-            Output.Close();
+            if (Output != null)
+            {
+                Output.Flush();
+                Output.Close();
+            }
         }
 
         private async Task ReadSampler(Sampler sampler)
@@ -149,14 +177,12 @@ namespace NtpMonitoringService
             {
                 if (Shutdown.WaitOne(0))
                 {
-                    EventLog.WriteEntry("Stopping monitor for NTP server: " + sampler.Server.ResolvedName);
                     sampler.Child.Kill();
                     System.Threading.Interlocked.Decrement(ref ChildCount);
                     break;
                 }
                 if (sampler.Child.HasExited)
                 {
-                    EventLog.WriteEntry("Restarting monitor for NTP server: " + sampler.Server.ResolvedName);
                     lock (RunningTasks)
                     {
                         if (!RunningTasks.ContainsKey(sampler.Server))
@@ -205,17 +231,31 @@ namespace NtpMonitoringService
             List<NtpServer> servers = new List<NtpServer>();
             foreach (string dnsName in DnsNames)
             {
-                // Resolve configured DNS name to list of addresses (to get list of servers)
-                IPHostEntry configuredHostEntry = Dns.GetHostEntry(dnsName);
-                foreach (IPAddress ip in configuredHostEntry.AddressList)
+                try
                 {
-                    // Resolve the address back to an actual host name
-                    IPHostEntry resolveHostEntry = Dns.GetHostEntry(ip);
-                    NtpServer server = new NtpServer();
-                    server.ConfiguredName = dnsName;
-                    server.ResolvedName = resolveHostEntry.HostName;
-                    server.Address = ip;
-                    servers.Add(server);
+                    // Resolve configured DNS name to list of addresses (to get list of servers)
+                    IPHostEntry configuredHostEntry = Dns.GetHostEntry(dnsName);
+                    foreach (IPAddress ip in configuredHostEntry.AddressList)
+                    {
+                        // Resolve the address back to an actual host name
+                        try
+                        {
+                            IPHostEntry resolveHostEntry = Dns.GetHostEntry(ip);
+
+                            NtpServer server = new NtpServer();
+                            server.ConfiguredName = dnsName;
+                            server.ResolvedName = resolveHostEntry.HostName;
+                            server.Address = ip;
+                            servers.Add(server);
+                        }
+                        catch (System.Net.Sockets.SocketException)
+                        {
+                        }
+                    }
+                }
+                catch (System.Net.Sockets.SocketException ex)
+                {
+                    EventLog.WriteEntry("Can't add server: " + dnsName + " due to error: " + ex.ErrorCode);
                 }
             }
             return servers.ToArray();
