@@ -198,12 +198,11 @@ namespace NtpMonitoringService
                 {
                     continue;
                 }
-
-                WriteSample(sampler.Server.ConfiguredName + "," + sampler.Server.Address.ToString() + ","  + sampler.Server.ResolvedName, s);
+                WriteSample(sampler.Server.Address.ToString(), s, sampler.Server.ConfiguredName + "," + sampler.Server.Address.ToString() + "," + sampler.Server.ResolvedName);
             }
         }
 
-        private void WriteSample(string Name, string Data)
+        private void WriteSample(string Prefix, string Data, string Suffix)
         {
             DateTime now = DateTime.Now;
             lock (writeLock)
@@ -221,7 +220,7 @@ namespace NtpMonitoringService
                     EventLog.WriteEntry("Writing to file: " + fileName);
                     Output = File.CreateText(fileName);
                 }
-                Output.WriteLine(Name + "," + Data);
+                Output.WriteLine(Prefix + "," + Data + "," + Suffix);
                 Output.Flush();
             }
         }
