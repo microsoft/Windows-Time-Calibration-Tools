@@ -5,15 +5,22 @@ using System.Linq;
 using System.ServiceProcess;
 using System.Threading.Tasks;
 using System.IO;
+using System.Net;
 
 namespace NtpMonitoringService
 {
     public partial class Monitoring : ServiceBase
     {
+        struct NtpServer
+        {
+            public string ConfiguredName;
+            public IPAddress Address;
+            public string ResolvedName;
+        }
         struct Sampler
         {
             public Process Child;
-            public string Name;
+            public NtpServer Server;
             public ProcessStartInfo StartInfo;
         }
         StreamWriter Output;
@@ -21,7 +28,7 @@ namespace NtpMonitoringService
         static int Hour;
         static System.Threading.ManualResetEvent Shutdown;
         static int ChildCount;
-        Dictionary<string, Task> RunningTasks = new Dictionary<string, Task>();
+        Dictionary<NtpServer, Task> RunningTasks = new Dictionary<NtpServer, Task>();
         System.Threading.Timer ConfigRefresh;
         private object writeLock = new Object();
 
@@ -45,12 +52,13 @@ namespace NtpMonitoringService
         {
             string keyName = "SYSTEM\\CurrentControlSet\\Services\\" + ServiceName + "\\Servers";
             Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(keyName);
-            string[] servers = key.GetValueNames();
-            List<string> removedServers = new List<string>();
-            List<string> addedServers = new List<string>();
+            NtpServer[] servers = ResolveServerNames(key.GetValueNames());
+            List<NtpServer> removedServers = new List<NtpServer>();
+            List<NtpServer> addedServers = new List<NtpServer>();
+
             lock (RunningTasks)
             {
-                foreach (string server in servers)
+                foreach (NtpServer server in servers)
                 {
                     // Existing entry
                     if (RunningTasks.ContainsKey(server))
@@ -64,46 +72,42 @@ namespace NtpMonitoringService
                     }
                 }
 
-
-                foreach (string server in RunningTasks.Keys)
+                foreach (NtpServer server in RunningTasks.Keys)
                 {
-                    if (servers.Contains(server))
+                    if (RunningTasks.ContainsKey(server))
                     {
                         continue;
                     }
                     removedServers.Add(server);
                 }
 
-                foreach (string server in addedServers)
+                foreach (NtpServer server in addedServers)
                 {
+                    string interval = (string)key.GetValue(server.ConfiguredName);
+
+                    EventLog.WriteEntry("Monitoring NTP server: " + server.ConfiguredName + " IPAddress: " + server.Address.ToString());
+
                     Sampler sample = new Sampler();
-                    sample.Name = server;
-                    string interval = (string)key.GetValue(server);
+                    sample.Server = server;
 
-                    if (interval.Length == 0)
-                    {
-                        interval = "1000";
-                    }
+                    sample.StartInfo.CreateNoWindow = true;
+                    sample.StartInfo.RedirectStandardOutput = true;
+                    sample.StartInfo.UseShellExecute = false;
 
-
-                    if (sample.Name == "localhost")
+                    if (server.ConfiguredName == "localhost")
                     {
                         sample.StartInfo = new ProcessStartInfo("TimeSampler.exe", "1000 3600");
                     }
                     else
                     {
-                        sample.StartInfo = new ProcessStartInfo("NtpSampler.exe", sample.Name + " " + interval + " 3600");
+                        sample.StartInfo = new ProcessStartInfo("NtpSampler.exe", server.Address.ToString() + " " + interval + " 3600");
                     }
-
-                    sample.StartInfo.CreateNoWindow = true;
-                    sample.StartInfo.RedirectStandardOutput = true;
-                    sample.StartInfo.UseShellExecute = false;
-                    EventLog.WriteEntry("Monitoring NTP server: " + sample.Name);
                     sample.Child = Process.Start(sample.StartInfo);
                     System.Threading.Interlocked.Increment(ref ChildCount);
                     RunningTasks.Add(server, ReadSampler(sample));
+
                 }
-                foreach (string server in removedServers)
+                foreach (NtpServer server in removedServers)
                 {
                     RunningTasks.Remove(server);
                 }
@@ -145,17 +149,17 @@ namespace NtpMonitoringService
             {
                 if (Shutdown.WaitOne(0))
                 {
-                    EventLog.WriteEntry("Stopping monitor for NTP server: " + sampler.Name);
+                    EventLog.WriteEntry("Stopping monitor for NTP server: " + sampler.Server.ResolvedName);
                     sampler.Child.Kill();
                     System.Threading.Interlocked.Decrement(ref ChildCount);
                     break;
                 }
                 if (sampler.Child.HasExited)
                 {
-                    EventLog.WriteEntry("Restarting monitor for NTP server: " + sampler.Name);
+                    EventLog.WriteEntry("Restarting monitor for NTP server: " + sampler.Server.ResolvedName);
                     lock (RunningTasks)
                     {
-                        if (!RunningTasks.ContainsKey(sampler.Name))
+                        if (!RunningTasks.ContainsKey(sampler.Server))
                         {
                             return;
                         }
@@ -168,7 +172,8 @@ namespace NtpMonitoringService
                 {
                     continue;
                 }
-                WriteSample(sampler.Name, s);
+
+                WriteSample(sampler.Server.ConfiguredName + "," + sampler.Server.Address.ToString() + ","  + sampler.Server.ResolvedName, s);
             }
         }
 
@@ -193,6 +198,27 @@ namespace NtpMonitoringService
                 Output.WriteLine(Name + "," + Data);
                 Output.Flush();
             }
+        }
+
+        private NtpServer[] ResolveServerNames(string [] DnsNames)
+        {
+            List<NtpServer> servers = new List<NtpServer>();
+            foreach (string dnsName in DnsNames)
+            {
+                // Resolve configured DNS name to list of addresses (to get list of servers)
+                IPHostEntry configuredHostEntry = Dns.GetHostEntry(dnsName);
+                foreach (IPAddress ip in configuredHostEntry.AddressList)
+                {
+                    // Resolve the address back to an actual host name
+                    IPHostEntry resolveHostEntry = Dns.GetHostEntry(ip);
+                    NtpServer server = new NtpServer();
+                    server.ConfiguredName = dnsName;
+                    server.ResolvedName = resolveHostEntry.HostName;
+                    server.Address = ip;
+                    servers.Add(server);
+                }
+            }
+            return servers.ToArray();
         }
     }
 }
