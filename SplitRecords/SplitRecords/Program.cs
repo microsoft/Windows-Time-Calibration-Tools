@@ -34,32 +34,36 @@ namespace SplitRecords
                 }
                 string[] Values = line.Split(',');
                 string name;
-
+                string fileName;
                 if (line.Contains("localhost"))
                 {
+                    fileName = "localhost";
                     name = "localhost";
                 }
                 else
                 {
-                    name = Values[(int)Columns.CONFIG_NAME] + "-" + Values[(int)Columns.IP_ADDRESS] + "-" + Values[(int)Columns.RESOLVED_NAME];
+                    fileName = Values[(int)Columns.CONFIG_NAME] + "-" + Values[(int)Columns.IP_ADDRESS] + "-" + Values[(int)Columns.RESOLVED_NAME];
+                    name = Values[(int)Columns.IP_ADDRESS];
                 }
                 if (!OutputFiles.ContainsKey(name))
                 {
-                    StreamWriter output = new StreamWriter(File.Open(name + ".out", FileMode.Create));
+                    StreamWriter output = new StreamWriter(File.Open(fileName + ".out", FileMode.Create));
                     OutputFiles.Add(name, output);
                 }
                 if (name == "localhost")
                 {
-                    OutputFiles[name].WriteLine(line.Substring(line.IndexOf(',') + 1));
+                    OutputFiles[name].WriteLine(line);
                 }
                 else
                 {
+                    OutputFiles[name].Write(Values[(int)Columns.IP_ADDRESS]);
+                    OutputFiles[name].Write(", ");
                     OutputFiles[name].Write(Values[(int)Columns.RDTSC_START]);
-                    OutputFiles[name].Write(',');
+                    OutputFiles[name].Write(", ");
                     OutputFiles[name].Write(Values[(int)Columns.RDTSC_END]);
-                    OutputFiles[name].Write(',');
+                    OutputFiles[name].Write(", ");
                     OutputFiles[name].Write(Values[(int)Columns.NTP_TIME]);
-                    OutputFiles[name].Write(',');
+                    OutputFiles[name].Write(", ");
                     OutputFiles[name].Write(Values[(int)Columns.RTT_DELAY]);
                     OutputFiles[name].WriteLine();
                 }
