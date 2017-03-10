@@ -101,7 +101,7 @@ namespace NtpMonitoringService
 
                     if (server.ConfiguredName == "localhost")
                     {
-                        sample.StartInfo = new ProcessStartInfo("TimeSampler.exe", "1000 3600");
+                        sample.StartInfo = new ProcessStartInfo("OsTimeSampler.exe", "1000 3600");
                     }
                     else
                     {
@@ -225,37 +225,81 @@ namespace NtpMonitoringService
             }
         }
 
-        private NtpServer[] ResolveServerNames(string [] DnsNames)
+        private Dictionary<IPAddress, string> ForwardDnsResolve(string[] DnsNames)
         {
-            List<NtpServer> servers = new List<NtpServer>();
+            Dictionary<IPAddress, string> names = new Dictionary<IPAddress, string>();
+            Dictionary<string, Task<IPHostEntry>> resolvers = new Dictionary<string, Task<IPHostEntry>>();
             foreach (string dnsName in DnsNames)
+            {
+                IPAddress ip;
+                if (IPAddress.TryParse(dnsName, out ip))
+                {
+                    names.Add(ip, dnsName);
+                }
+                else
+                {
+                    resolvers.Add(dnsName, Dns.GetHostEntryAsync(dnsName));
+                }
+            }
+
+            foreach (var entry in resolvers)
             {
                 try
                 {
-                    // Resolve configured DNS name to list of addresses (to get list of servers)
-                    IPHostEntry configuredHostEntry = Dns.GetHostEntry(dnsName);
-                    foreach (IPAddress ip in configuredHostEntry.AddressList)
+                    entry.Value.Wait();
+                    foreach (var ip in entry.Value.Result.AddressList)
                     {
-                        // Resolve the address back to an actual host name
-                        try
+                        if (!names.ContainsKey(ip))
                         {
-                            IPHostEntry resolveHostEntry = Dns.GetHostEntry(ip);
-
-                            NtpServer server = new NtpServer();
-                            server.ConfiguredName = dnsName;
-                            server.ResolvedName = resolveHostEntry.HostName;
-                            server.Address = ip;
-                            servers.Add(server);
-                        }
-                        catch (System.Net.Sockets.SocketException)
-                        {
+                            names.Add(ip, entry.Key);
                         }
                     }
                 }
-                catch (System.Net.Sockets.SocketException ex)
+                catch (System.AggregateException)
                 {
-                    EventLog.WriteEntry("Can't add server: " + dnsName + " due to error: " + ex.ErrorCode);
+                    EventLog.WriteEntry("Can't add server: " + entry.Key.ToString());
                 }
+            }
+            return names;
+        }
+
+        private Dictionary<IPAddress, string> ReverseDnsResolve(IPAddress[] IpAddresses)
+        {
+            Dictionary<IPAddress, string> names = new Dictionary<IPAddress, string>();
+            Dictionary<IPAddress, Task<IPHostEntry>> resolvers = new Dictionary<IPAddress, Task<IPHostEntry>>();
+            foreach (var ip in IpAddresses)
+            {
+                resolvers.Add(ip, Dns.GetHostEntryAsync(ip));
+            }
+
+            foreach (var entry in resolvers)
+            {
+                try
+                {
+                    entry.Value.Wait();
+                    names.Add(entry.Key, entry.Value.Result.HostName);
+                }
+                catch (System.AggregateException)
+                {
+                }
+            }
+            return names;
+        }
+
+        private NtpServer[] ResolveServerNames(string [] DnsNames)
+        {
+            List<NtpServer> servers = new List<NtpServer>();
+            Dictionary<IPAddress, string> addresses = ForwardDnsResolve(DnsNames);
+            Dictionary<IPAddress, string> hostnames = ReverseDnsResolve(addresses.Keys.ToArray());
+
+            foreach (var address in addresses)
+            {
+                NtpServer server = new NtpServer();
+                server.ConfiguredName = address.Value;
+                server.ResolvedName = (hostnames.ContainsKey(address.Key) ? hostnames[address.Key] : address.Value);
+                server.Address = address.Key;
+                servers.Add(server);
+
             }
             return servers.ToArray();
         }
