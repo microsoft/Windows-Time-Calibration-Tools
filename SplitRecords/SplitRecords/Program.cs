@@ -77,11 +77,16 @@ namespace SplitRecords
                 Console.Error.WriteLine("Usage: FirstFile LastFile");
                 return;
             }
-            string First = args[0].ToUpperInvariant();
-            string Last = args[1].ToUpperInvariant();
-            foreach (string s in Directory.EnumerateFiles("."))
+            string First = args[0].Substring(args[0].LastIndexOf('\\') + 1).ToUpperInvariant();
+            string Last = args[1].Substring(args[1].LastIndexOf('\\') + 1).ToUpperInvariant();
+            string Folder = args[0].Substring(0, args[0].LastIndexOf('\\'));
+            if (Folder.Length == 0)
             {
-                string fileName = s.Remove(0, 2).ToUpperInvariant();
+                Folder = ".";
+            }
+            foreach (string s in Directory.EnumerateFiles(Folder))
+            {
+                string fileName = s.Substring(s.LastIndexOf('\\') + 1).ToUpperInvariant();
                 if (fileName.CompareTo(First) < 0)
                 {
                     continue;
@@ -91,7 +96,7 @@ namespace SplitRecords
                     break;
                 }
 
-                ProcessFile(fileName);
+                ProcessFile(s);
             }
             foreach (var o in OutputFiles.Values)
             {
