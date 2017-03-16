@@ -7,12 +7,12 @@ namespace NtpMonitoringService
         /// <summary>
         /// The main entry point for the application.
         /// </summary>
-        static void Main()
+        static void Main(string [] Argv)
         {
             ServiceBase[] ServicesToRun;
             ServicesToRun = new ServiceBase[]
             {
-                new Monitoring()
+                new Monitoring(Argv)
             };
             ServiceBase.Run(ServicesToRun);
         }
