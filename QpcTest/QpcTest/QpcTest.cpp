@@ -44,17 +44,18 @@ void ScaleAndPrintResults(LARGE_INTEGER Start, LARGE_INTEGER End, size_t SampleS
 
 int main(int argc, char ** argv)
 {
-	if (argc != 2) {
-		printf("%s samples_size\n", argv[0]);
+	if (argc != 3) {
+		printf("%s samples_size iterations\n", argv[0]);
 		exit(-1);
 	}
 
 	size_t sampleSize = atoll(argv[1]);
+	size_t iterations = atol(argv[2]);
 	DWORD64* samples = new DWORD64[sampleSize];
 	memset(samples, 0, sizeof(DWORD64) * sampleSize);
 
 
-	for (int j = 0; j < 10; j++)
+	for (int j = 0; j < iterations; j++)
 	{
 		FILETIME ft;
 		LARGE_INTEGER start, end;
@@ -67,7 +68,7 @@ int main(int argc, char ** argv)
 		QueryPerformanceCounter(&end);
 		ScaleAndPrintResults(start, end, sampleSize, samples, "GetSystemTimePreciseAsFileTime");
 	}
-	for (int j = 0; j < 10; j++)
+	for (int j = 0; j < iterations; j++)
 	{
 		LARGE_INTEGER ft;
 		LARGE_INTEGER start, end;
@@ -81,7 +82,7 @@ int main(int argc, char ** argv)
 		ScaleAndPrintResults(start, end, sampleSize, samples, "QueryPerformanceCounter");
 	}
 
-	for (int j = 0; j < 10; j++)
+	for (int j = 0; j < iterations; j++)
 	{
 		LARGE_INTEGER start, end;
 		QueryPerformanceCounter(&start);
