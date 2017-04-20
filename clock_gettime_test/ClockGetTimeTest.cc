@@ -99,7 +99,7 @@ int main(int argc, char ** argv)
 			samples[i] = __rdtsc();
 		}
 		clock_gettime(CLOCK_REALTIME, &end);
-		ScaleAndPrintResults(start, end, sampleSize, samples, "GetSystemTimePreciseAsFileTime");
+		ScaleAndPrintResults(start, end, sampleSize, samples, "clock_gettime");
 	}
 
 	for (int j = 0; j < iterations; j++)
