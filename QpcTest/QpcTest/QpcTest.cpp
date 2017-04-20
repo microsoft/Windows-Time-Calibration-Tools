@@ -2,67 +2,95 @@
 //
 
 #include "stdafx.h"
+#include <math.h>
 #include <Windows.h>
 
-int main()
+double StdDevAsFractionOfMean(DWORD64 * Samples, size_t SampleSize)
 {
+	double mean = 0;
+	double err = 0;
+	DWORD64 previous = Samples[0];
+	for (size_t i = 1; i < SampleSize; i++)
+	{
+		mean += Samples[i] - previous;
+		previous = Samples[i];
+	}
+	mean /= SampleSize;
+	previous = Samples[0];
+	for (size_t i = 1; i < SampleSize; i++)
+	{
+		double delta = Samples[i] - previous;
+		delta -= mean;
+		err += delta * delta;
+		previous = Samples[i];
+	}
+	err /= SampleSize;
+	err = sqrt(err);
+	return err / mean;
+}
+
+void ScaleAndPrintResults(LARGE_INTEGER Start, LARGE_INTEGER End, size_t SampleSize, DWORD64* Samples, const char * Name)
+{
+	LARGE_INTEGER freq;
+	QueryPerformanceFrequency(&freq);
+
+	double queryTime = End.QuadPart - Start.QuadPart;
+	queryTime /= freq.QuadPart;
+	queryTime /= SampleSize;
+	queryTime *= 1e9;
+	double stdev = StdDevAsFractionOfMean(Samples, SampleSize) * queryTime;
+	printf("%s latency %.1fns STDEV %.1fns\n", Name, queryTime, stdev);
+}
+
+int main(int argc, char ** argv)
+{
+	if (argc != 2) {
+		printf("%s samples_size\n", argv[0]);
+		exit(-1);
+	}
+
+	size_t sampleSize = atoll(argv[1]);
+	DWORD64* samples = new DWORD64[sampleSize];
+	memset(samples, 0, sizeof(DWORD64) * sampleSize);
+
+
 	for (int j = 0; j < 10; j++)
 	{
 		FILETIME ft;
-
-		LARGE_INTEGER ts1, ts2, freq;
-		__int64 total = 0;
-		QueryPerformanceCounter(&ts1);
-		for (long long i = 0; i < 1000000; i++)
+		LARGE_INTEGER start, end;
+		QueryPerformanceCounter(&start);
+		for (long long i = 0; i < sampleSize; i++)
 		{
 			GetSystemTimePreciseAsFileTime(&ft);
+			samples[i] = __rdtsc();
 		}
-		QueryPerformanceCounter(&ts2);
-		total += ts2.QuadPart - ts1.QuadPart;
-
-		QueryPerformanceFrequency(&freq);
-		double queryTime = total;
-		queryTime /= freq.QuadPart;
-		printf("GetSystemTimePreciseAsFileTime latency %.3f\n", queryTime*1000);
+		QueryPerformanceCounter(&end);
+		ScaleAndPrintResults(start, end, sampleSize, samples, "GetSystemTimePreciseAsFileTime");
 	}
 	for (int j = 0; j < 10; j++)
 	{
 		LARGE_INTEGER ft;
-
-		LARGE_INTEGER ts1, ts2, freq;
-		__int64 total = 0;
-		QueryPerformanceCounter(&ts1);
-		for (long long i = 0; i < 1000000; i++)
+		LARGE_INTEGER start, end;
+		QueryPerformanceCounter(&start);
+		for (long long i = 0; i < sampleSize; i++)
 		{
 			QueryPerformanceCounter(&ft);
+			samples[i] = __rdtsc();
 		}
-		QueryPerformanceCounter(&ts2);
-		total += ts2.QuadPart - ts1.QuadPart;
-
-		QueryPerformanceFrequency(&freq);
-		double queryTime = total;
-		queryTime /= freq.QuadPart;
-		printf("QueryPerformanceCounter latency %.3f\n", queryTime*1000);
+		QueryPerformanceCounter(&end);
+		ScaleAndPrintResults(start, end, sampleSize, samples, "QueryPerformanceCounter");
 	}
 
 	for (int j = 0; j < 10; j++)
 	{
-		DWORD64 ft;
-
-		LARGE_INTEGER ts1, ts2, freq;
-		__int64 total = 0;
-		QueryPerformanceCounter(&ts1);
-		for (long long i = 0; i < 1000000; i++)
+		LARGE_INTEGER start, end;
+		QueryPerformanceCounter(&start);
+		for (long long i = 0; i < sampleSize; i++)
 		{
-			ft = __rdtsc();
+			samples[i] = __rdtsc();
 		}
-		QueryPerformanceCounter(&ts2);
-		total += ts2.QuadPart - ts1.QuadPart;
-
-		QueryPerformanceFrequency(&freq);
-		double queryTime = total;
-		queryTime /= freq.QuadPart;
-		printf("__rdtsc latency %.3f\n", queryTime*1000);
+		QueryPerformanceCounter(&end);
+		ScaleAndPrintResults(start, end, sampleSize, samples, "__rdtsc");
 	}
 
 	return 0;
