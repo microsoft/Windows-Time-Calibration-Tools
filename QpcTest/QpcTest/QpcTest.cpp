@@ -50,6 +50,12 @@ int main(int argc, char ** argv)
 		exit(-1);
 	}
 
+    // Dump the command line args
+    for (int i = 0; i < argc; i++) {
+        printf("%s ", argv[i]);
+    }
+    printf("\n");
+
 	size_t sampleSize = atoll(argv[1]);
 	size_t iterations = atol(argv[2]);
 	DWORD64* samples = new DWORD64[sampleSize];
