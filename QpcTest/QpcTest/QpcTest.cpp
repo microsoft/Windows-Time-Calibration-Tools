@@ -4,6 +4,7 @@
 #include "stdafx.h"
 #include <math.h>
 #include <Windows.h>
+#include <intrin.h>  
 
 double StdDevAsFractionOfMean(DWORD64 * Samples, size_t SampleSize)
 {
@@ -93,6 +94,18 @@ int main(int argc, char ** argv)
 		QueryPerformanceCounter(&end);
 		ScaleAndPrintResults(start, end, sampleSize, samples, "__rdtsc");
 	}
+    for (int j = 0; j < iterations; j++)
+    {
+        LARGE_INTEGER start, end;
+        QueryPerformanceCounter(&start);
+        for (long long i = 0; i < sampleSize; i++)
+        {
+            unsigned int cpuid;
+            samples[i] = __rdtscp(&cpuid);
+        }
+        QueryPerformanceCounter(&end);
+        ScaleAndPrintResults(start, end, sampleSize, samples, "__rdtscp");
+    }
 
 	return 0;
 }
