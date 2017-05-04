@@ -5,6 +5,7 @@
 #include <math.h>
 #include <Windows.h>
 #include <intrin.h>  
+#include "CpuId.h"
 
 double StdDevAsFractionOfMean(DWORD64 * Samples, size_t SampleSize)
 {
@@ -20,7 +21,7 @@ double StdDevAsFractionOfMean(DWORD64 * Samples, size_t SampleSize)
 	previous = Samples[0];
 	for (size_t i = 1; i < SampleSize; i++)
 	{
-		double delta = Samples[i] - previous;
+		double delta = static_cast<double>(Samples[i] - previous);
 		delta -= mean;
 		err += delta * delta;
 		previous = Samples[i];
@@ -35,7 +36,7 @@ void ScaleAndPrintResults(LARGE_INTEGER Start, LARGE_INTEGER End, size_t SampleS
 	LARGE_INTEGER freq;
 	QueryPerformanceFrequency(&freq);
 
-	double queryTime = End.QuadPart - Start.QuadPart;
+	double queryTime = static_cast<double>(End.QuadPart - Start.QuadPart);
 	queryTime /= freq.QuadPart;
 	queryTime /= SampleSize;
 	queryTime *= 1e9;
@@ -45,7 +46,10 @@ void ScaleAndPrintResults(LARGE_INTEGER Start, LARGE_INTEGER End, size_t SampleS
 
 int main(int argc, char ** argv)
 {
-	if (argc != 3) {
+    PROCESSOR_NUMBER idealCpu;
+    DWORD_PTR affinityMask = 1;
+    
+    if (argc != 3) {
 		printf("%s samples_size iterations\n", argv[0]);
 		exit(-1);
 	}
@@ -54,7 +58,14 @@ int main(int argc, char ** argv)
     for (int i = 0; i < argc; i++) {
         printf("%s ", argv[i]);
     }
+    printf("CPU info\n");
+    printf("Vendor: %s Brand: %s\n", InstructionSet::Vendor().c_str(), InstructionSet::Brand().c_str());
     printf("\n");
+    if (!InstructionSet::TscInvariant())
+    {
+        printf("CPU doesn't support invariant TSC\n");
+        exit(-1);
+    }
 
 	size_t sampleSize = atoll(argv[1]);
 	size_t iterations = atol(argv[2]);
@@ -62,12 +73,26 @@ int main(int argc, char ** argv)
 	memset(samples, 0, sizeof(DWORD64) * sampleSize);
 
 
+    // Prevent code from swapping CPU
+    if (!GetThreadIdealProcessorEx(GetCurrentThread(), &idealCpu)) 
+    {
+        printf("GetThreadIdealProcessorEx failed %d\n", GetLastError());
+        exit(-1);
+    }
+    affinityMask = 1ull << idealCpu.Number;
+
+    if (!SetThreadAffinityMask(GetCurrentThread(), affinityMask))
+    {
+        printf("SetThreadAffinityMask failed %d\n", GetLastError());
+        exit(-1);
+    }
+
 	for (int j = 0; j < iterations; j++)
 	{
 		FILETIME ft;
 		LARGE_INTEGER start, end;
 		QueryPerformanceCounter(&start);
-		for (long long i = 0; i < sampleSize; i++)
+		for (size_t i = 0; i < sampleSize; i++)
 		{
 			GetSystemTimePreciseAsFileTime(&ft);
 			samples[i] = __rdtsc();
@@ -80,7 +105,7 @@ int main(int argc, char ** argv)
 		LARGE_INTEGER ft;
 		LARGE_INTEGER start, end;
 		QueryPerformanceCounter(&start);
-		for (long long i = 0; i < sampleSize; i++)
+		for (size_t i = 0; i < sampleSize; i++)
 		{
 			QueryPerformanceCounter(&ft);
 			samples[i] = __rdtsc();
@@ -93,26 +118,28 @@ int main(int argc, char ** argv)
 	{
 		LARGE_INTEGER start, end;
 		QueryPerformanceCounter(&start);
-		for (long long i = 0; i < sampleSize; i++)
+		for (size_t i = 0; i < sampleSize; i++)
 		{
 			samples[i] = __rdtsc();
 		}
 		QueryPerformanceCounter(&end);
 		ScaleAndPrintResults(start, end, sampleSize, samples, "__rdtsc");
 	}
-    for (int j = 0; j < iterations; j++)
+    if (InstructionSet::RDTSCP())
     {
-        LARGE_INTEGER start, end;
-        QueryPerformanceCounter(&start);
-        for (long long i = 0; i < sampleSize; i++)
+        for (size_t j = 0; j < iterations; j++)
         {
-            unsigned int cpuid;
-            samples[i] = __rdtscp(&cpuid);
+            LARGE_INTEGER start, end;
+            QueryPerformanceCounter(&start);
+            for (size_t i = 0; i < sampleSize; i++)
+            {
+                unsigned int cpuid;
+                samples[i] = __rdtscp(&cpuid);
+            }
+            QueryPerformanceCounter(&end);
+            ScaleAndPrintResults(start, end, sampleSize, samples, "__rdtscp");
         }
-        QueryPerformanceCounter(&end);
-        ScaleAndPrintResults(start, end, sampleSize, samples, "__rdtscp");
     }
-
 	return 0;
 }
 
