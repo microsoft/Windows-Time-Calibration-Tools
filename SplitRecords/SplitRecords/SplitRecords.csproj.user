@@ -1,0 +1,7 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
+    <StartWorkingDirectory>C:\ntp\logs</StartWorkingDirectory>
+    <StartArguments>\\ntdev-ntp-msg\c%24\longhaul2\logs\73d736ec-ff41-4ec2-9dcf-e3c8fed047f8.201703091831.csv \\ntdev-ntp-msg\c%24\longhaul2\logs\73d736ec-ff41-4ec2-9dcf-e3c8fed047f8.201703091831.csv</StartArguments>
+  </PropertyGroup>
+</Project>
