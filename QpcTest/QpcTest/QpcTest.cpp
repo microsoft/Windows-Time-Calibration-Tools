@@ -58,9 +58,8 @@ int main(int argc, char ** argv)
     for (int i = 0; i < argc; i++) {
         printf("%s ", argv[i]);
     }
-    printf("CPU info\n");
-    printf("Vendor: %s Brand: %s\n", InstructionSet::Vendor().c_str(), InstructionSet::Brand().c_str());
     printf("\n");
+    printf("CPU Info: Vendor: %s Brand: %s\n", InstructionSet::Vendor().c_str(), InstructionSet::Brand().c_str());
     if (!InstructionSet::TscInvariant())
     {
         printf("CPU doesn't support invariant TSC\n");
@@ -72,13 +71,15 @@ int main(int argc, char ** argv)
 	DWORD64* samples = new DWORD64[sampleSize];
 	memset(samples, 0, sizeof(DWORD64) * sampleSize);
 
-
     // Prevent code from swapping CPU
     if (!GetThreadIdealProcessorEx(GetCurrentThread(), &idealCpu)) 
     {
         printf("GetThreadIdealProcessorEx failed %d\n", GetLastError());
         exit(-1);
     }
+
+    printf("Affinitizing to CPU %d\n", idealCpu.Number);
+    printf("\n");
     affinityMask = 1ull << idealCpu.Number;
 
     if (!SetThreadAffinityMask(GetCurrentThread(), affinityMask))
