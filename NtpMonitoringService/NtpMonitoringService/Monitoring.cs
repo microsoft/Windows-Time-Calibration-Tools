@@ -142,7 +142,7 @@ namespace NtpMonitoringService
             BaseFileName = key.GetValue("BasePath").ToString() + "\\" + Guid.NewGuid().ToString() + ".";
             Shutdown = new System.Threading.ManualResetEvent(false);
 
-            Resolver = new StreamWriter(File.Open(BaseFileName + ".resolver.log", FileMode.Append));
+            Resolver = new StreamWriter(File.Open(BaseFileName + "resolver.log", FileMode.Append, FileAccess.Write, FileShare.Read));
 
             ConfigRefresh = new System.Threading.Timer((object o) => { UpdateServerList(); });
             ConfigRefresh.Change(0, 60000);
@@ -259,7 +259,7 @@ namespace NtpMonitoringService
                     entry.Value.Wait();
                     foreach (var ip in entry.Value.Result.AddressList)
                     {
-                        Resolver.Write(ip.ToString());
+                        Resolver.Write(ip.ToString() + ",");
                         if (!names.ContainsKey(ip))
                         {
                             names.Add(ip, entry.Key);
