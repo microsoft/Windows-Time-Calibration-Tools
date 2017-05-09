@@ -24,7 +24,6 @@ namespace NtpMonitoringService
             public ProcessStartInfo StartInfo;
         }
         StreamWriter Output;
-        StreamWriter Resolver;
         static string BaseFileName;
         static int Hour;
         static System.Threading.ManualResetEvent Shutdown;
@@ -142,8 +141,6 @@ namespace NtpMonitoringService
             BaseFileName = key.GetValue("BasePath").ToString() + "\\" + Guid.NewGuid().ToString() + ".";
             Shutdown = new System.Threading.ManualResetEvent(false);
 
-            Resolver = new StreamWriter(File.Open(BaseFileName + ".resolver.log", FileMode.Append));
-
             ConfigRefresh = new System.Threading.Timer((object o) => { UpdateServerList(); });
             ConfigRefresh.Change(0, 60000);
         }
@@ -238,6 +235,10 @@ namespace NtpMonitoringService
         {
             Dictionary<IPAddress, string> names = new Dictionary<IPAddress, string>();
             Dictionary<string, Task<IPHostEntry>> resolvers = new Dictionary<string, Task<IPHostEntry>>();
+            DateTime now = DateTime.Now;
+            string fileName = BaseFileName + now.Year.ToString("D4") + now.Month.ToString("D2") + now.Day.ToString("D2") + now.Hour.ToString("D2") + ".resolver.csv";
+            StreamWriter Resolver = new StreamWriter(File.Open(fileName, FileMode.Append, FileAccess.Write, FileShare.Read));
+            Resolver.WriteLine("Starting name resolution at " + DateTime.Now.ToString());
             foreach (string dnsName in DnsNames)
             {
                 IPAddress ip;
@@ -259,7 +260,7 @@ namespace NtpMonitoringService
                     entry.Value.Wait();
                     foreach (var ip in entry.Value.Result.AddressList)
                     {
-                        Resolver.Write(ip.ToString());
+                        Resolver.Write(ip.ToString() + ",");
                         if (!names.ContainsKey(ip))
                         {
                             names.Add(ip, entry.Key);
@@ -269,11 +270,21 @@ namespace NtpMonitoringService
                 catch (System.AggregateException ex)
                 {
                     Resolver.Write("FAILED ");
-                    Resolver.Write(ex.InnerException.ToString());
+                    if (ex.InnerException is System.Net.Sockets.SocketException)
+                    {
+                        System.Net.Sockets.SocketException s = (System.Net.Sockets.SocketException)ex.InnerException;
+                        Resolver.Write(s.ErrorCode + "," + ex.InnerException.Message);
+                    }
+                    else
+                    {
+                        Resolver.Write(ex.InnerException.Message.ToString());
+                    }
                 }
                 Resolver.WriteLine();
             }
+            Resolver.WriteLine("Ending name resolution at " + DateTime.Now.ToString());
             Resolver.Flush();
+            Resolver.Close();
             return names;
         }
 
