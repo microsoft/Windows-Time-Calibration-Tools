@@ -24,6 +24,7 @@ namespace NtpMonitoringService
             public ProcessStartInfo StartInfo;
         }
         StreamWriter Output;
+        StreamWriter Resolver;
         static string BaseFileName;
         static int Hour;
         static System.Threading.ManualResetEvent Shutdown;
@@ -141,6 +142,8 @@ namespace NtpMonitoringService
             BaseFileName = key.GetValue("BasePath").ToString() + "\\" + Guid.NewGuid().ToString() + ".";
             Shutdown = new System.Threading.ManualResetEvent(false);
 
+            Resolver = new StreamWriter(File.Open(BaseFileName + ".resolver.log", FileMode.Append));
+
             ConfigRefresh = new System.Threading.Timer((object o) => { UpdateServerList(); });
             ConfigRefresh.Change(0, 60000);
         }
@@ -148,8 +151,6 @@ namespace NtpMonitoringService
         protected override void OnStop()
         {
             ConfigRefresh.Change(System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
-            ConfigRefresh.Dispose();
-            ConfigRefresh = null;
 
             Shutdown.Set();
 
@@ -159,10 +160,18 @@ namespace NtpMonitoringService
                 tasks = new Task[RunningTasks.Values.Count];
                 RunningTasks.Values.CopyTo(tasks, 0);
             }
+            
 
             foreach (Task task in tasks)
             {
-                task.Wait();
+                try
+                {
+                    task.Wait();
+                }
+                catch (System.AggregateException)
+                {
+
+                }
             }
             if (Output != null)
             {
@@ -244,22 +253,27 @@ namespace NtpMonitoringService
 
             foreach (var entry in resolvers)
             {
+                Resolver.Write(entry.Key + ",");
                 try
                 {
                     entry.Value.Wait();
                     foreach (var ip in entry.Value.Result.AddressList)
                     {
+                        Resolver.Write(ip.ToString());
                         if (!names.ContainsKey(ip))
                         {
                             names.Add(ip, entry.Key);
                         }
                     }
                 }
-                catch (System.AggregateException)
+                catch (System.AggregateException ex)
                 {
-                    EventLog.WriteEntry("Can't add server: " + entry.Key.ToString());
+                    Resolver.Write("FAILED ");
+                    Resolver.Write(ex.InnerException.ToString());
                 }
+                Resolver.WriteLine();
             }
+            Resolver.Flush();
             return names;
         }
 
