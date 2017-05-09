@@ -238,7 +238,7 @@ namespace NtpMonitoringService
             DateTime now = DateTime.Now;
             string fileName = BaseFileName + now.Year.ToString("D4") + now.Month.ToString("D2") + now.Day.ToString("D2") + now.Hour.ToString("D2") + ".resolver.csv";
             StreamWriter Resolver = new StreamWriter(File.Open(fileName, FileMode.Append, FileAccess.Write, FileShare.Read));
-
+            Resolver.WriteLine("Starting name resolution at " + DateTime.Now.ToString());
             foreach (string dnsName in DnsNames)
             {
                 IPAddress ip;
@@ -282,6 +282,7 @@ namespace NtpMonitoringService
                 }
                 Resolver.WriteLine();
             }
+            Resolver.WriteLine("Ending name resolution at " + DateTime.Now.ToString());
             Resolver.Flush();
             Resolver.Close();
             return names;
