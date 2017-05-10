@@ -34,6 +34,7 @@ namespace NtpMonitoringService
         private object writeLock = new Object();
         private string ConfiguredServiceName;
         private EventLog Log;
+        private List<Process> ChildProcesses;
 
         public Monitoring(string [] Argv)
         {
@@ -114,6 +115,10 @@ namespace NtpMonitoringService
                     sample.StartInfo.RedirectStandardOutput = true;
                     sample.StartInfo.UseShellExecute = false;
                     sample.Child = Process.Start(sample.StartInfo);
+                    lock (ChildProcesses)
+                    {
+                        ChildProcesses.Add(sample.Child);
+                    }
                     System.Threading.Interlocked.Increment(ref ChildCount);
                     RunningTasks.Add(server, ReadSampler(sample));
 
@@ -145,7 +150,7 @@ namespace NtpMonitoringService
             {
                 Log = EventLog;
             }
-
+            ChildProcesses = new List<Process>();
             ChildCount = 0;
             Output = null;
             Hour = -1;
@@ -180,26 +185,26 @@ namespace NtpMonitoringService
             ConfigRefresh.Change(System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
 
             Shutdown.Set();
-
-            Task[] tasks;
             lock (RunningTasks)
             {
-                tasks = new Task[RunningTasks.Values.Count];
-                RunningTasks.Values.CopyTo(tasks, 0);
+                RunningTasks.Clear();
             }
-            
 
-            foreach (Task task in tasks)
+            lock (ChildProcesses)
             {
-                try
+                foreach (var Child in ChildProcesses)
                 {
-                    task.Wait();
-                }
-                catch (System.AggregateException)
-                {
+                    try
+                    {
+                        Child.Kill();
+                    }
+                    catch (Exception)
+                    {
 
+                    }
                 }
             }
+
             if (Output != null)
             {
                 Output.Flush();
@@ -213,12 +218,16 @@ namespace NtpMonitoringService
             {
                 if (Shutdown.WaitOne(0))
                 {
-                    sampler.Child.Kill();
                     System.Threading.Interlocked.Decrement(ref ChildCount);
                     break;
                 }
                 if (sampler.Child.HasExited)
                 {
+                    lock (ChildProcesses)
+                    {
+                        ChildProcesses.Remove(sampler.Child);
+                    }
+
                     lock (RunningTasks)
                     {
                         if (!RunningTasks.ContainsKey(sampler.Server))
