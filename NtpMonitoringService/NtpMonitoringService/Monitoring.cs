@@ -11,28 +11,29 @@ namespace NtpMonitoringService
 {
     public partial class Monitoring : ServiceBase
     {
-        struct NtpServer
+        private struct NtpServer
         {
             public string ConfiguredName;
             public IPAddress Address;
             public string ResolvedName;
         }
-        struct Sampler
+        private struct Sampler
         {
             public Process Child;
             public NtpServer Server;
             public ProcessStartInfo StartInfo;
         }
-        StreamWriter Output;
-        static string BaseFileName;
-        static string LogFilePath;
-        static int Hour;
-        static System.Threading.ManualResetEvent Shutdown;
-        static int ChildCount;
-        Dictionary<NtpServer, Task> RunningTasks = new Dictionary<NtpServer, Task>();
-        System.Threading.Timer ConfigRefresh;
+        private StreamWriter Output;
+        private static string BaseFileName;
+        private static string LogFilePath;
+        private static int Hour;
+        private static System.Threading.ManualResetEvent Shutdown;
+        private static int ChildCount;
+        private Dictionary<NtpServer, Task> RunningTasks = new Dictionary<NtpServer, Task>();
+        private System.Threading.Timer ConfigRefresh;
         private object writeLock = new Object();
         private string ConfiguredServiceName;
+        private EventLog Log;
 
         public Monitoring(string [] Argv)
         {
@@ -94,7 +95,7 @@ namespace NtpMonitoringService
                         interval = "5000";
                     }
 
-                    EventLog.WriteEntry("Monitoring NTP server: " + server.ConfiguredName + " IPAddress: " + server.Address.ToString());
+                    Log.WriteEntry("Monitoring NTP server: " + server.ConfiguredName + " IPAddress: " + server.Address.ToString());
 
                     Sampler sample = new Sampler();
                     sample.Server = server;
@@ -134,6 +135,15 @@ namespace NtpMonitoringService
                 EventLog.WriteEntry("Missing configuration subkey: " + keyName);
                 Stop();
                 return;
+            }
+            if (EventLog.SourceExists(ConfiguredServiceName) && EventLog.Exists(ConfiguredServiceName))
+            {
+                Log = new EventLog(ConfiguredServiceName);
+                Log.Source = ConfiguredServiceName;
+            }
+            else
+            {
+                Log = EventLog;
             }
 
             ChildCount = 0;
@@ -243,7 +253,7 @@ namespace NtpMonitoringService
                         Output.Close();
                     }
                     fileName = BaseFileName + now.Year.ToString("D4") + now.Month.ToString("D2") + now.Day.ToString("D2") + now.Hour.ToString("D2") + now.Minute.ToString("D2") + ".csv";
-                    EventLog.WriteEntry("Writing to file: " + fileName);
+                    Log.WriteEntry("Writing to file: " + fileName);
                     Output = File.CreateText(fileName);
                 }
                 Output.WriteLine(Prefix + "," + Data + "," + Suffix);
