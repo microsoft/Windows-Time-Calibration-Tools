@@ -261,7 +261,7 @@ namespace NtpMonitoringService
             if (LogFilePath != null)
             {
                 string fileName = LogFilePath + now.Year.ToString("D4") + now.Month.ToString("D2") + now.Day.ToString("D2") + now.Hour.ToString("D2") + ".resolver.csv";
-                resolverLog = new StreamWriter(File.Open(fileName, FileMode.Append, FileAccess.Write, FileShare.Read));
+                resolverLog = new StreamWriter(File.Open(fileName, FileMode.Append, FileAccess.Write, FileShare.ReadWrite));
             }
             if (resolverLog != null) resolverLog.WriteLine("Starting name resolution at " + DateTime.Now.ToString());
             foreach (string dnsName in DnsNames)
@@ -312,6 +312,7 @@ namespace NtpMonitoringService
                 resolverLog.WriteLine("Ending name resolution at " + DateTime.Now.ToString());
                 resolverLog.Flush();
                 resolverLog.Close();
+                resolverLog.Dispose();
             }
             return names;
         }
