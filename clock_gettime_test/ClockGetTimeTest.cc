@@ -86,7 +86,7 @@ void SetCpuAffinity()
 	cpuSet = CPU_ALLOC(cpu);
         CPU_ZERO_S(cpuSetSize, cpuSet);
         sched_setaffinity(0, cpuSetSize, cpuSet);
-        printf("Running on CPU %d\n", cpu);
+        printf("Affinitizing to CPU %d\n", cpu);
         CPU_FREE(cpuSet);
 }
 
