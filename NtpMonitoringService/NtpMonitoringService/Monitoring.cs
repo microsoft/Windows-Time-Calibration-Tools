@@ -260,7 +260,7 @@ namespace NtpMonitoringService
             
             if (LogFilePath != null)
             {
-                string fileName = BaseFileName + now.Year.ToString("D4") + now.Month.ToString("D2") + now.Day.ToString("D2") + now.Hour.ToString("D2") + ".resolver.csv";
+                string fileName = LogFilePath + now.Year.ToString("D4") + now.Month.ToString("D2") + now.Day.ToString("D2") + now.Hour.ToString("D2") + ".resolver.csv";
                 resolverLog = new StreamWriter(File.Open(fileName, FileMode.Append, FileAccess.Write, FileShare.Read));
             }
             if (resolverLog != null) resolverLog.WriteLine("Starting name resolution at " + DateTime.Now.ToString());
