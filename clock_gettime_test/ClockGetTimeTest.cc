@@ -58,10 +58,10 @@ double StdDevAsFractionOfMean(DWORD64 * Samples, size_t SampleSize)
 
 double TimeFromTimeSpec(timespec t)
 {
+	// Return time as seconds
 	double time = t.tv_nsec;
 	time /= 1e9;
 	time += t.tv_sec;
-        time /= 1e9;
 	return time;
 }
 
@@ -71,6 +71,7 @@ void ScaleAndPrintResults(timespec Start, timespec End, size_t SampleSize, DWORD
 
 	double queryTime = TimeFromTimeSpec(End) - TimeFromTimeSpec(Start);
 	queryTime *= 1e9;
+        queryTime /= SampleSize;
 	double stdev = StdDevAsFractionOfMean(Samples, SampleSize) * queryTime;
 	printf("%s latency %.1fns STDEV %.1fns\n", Name, queryTime, stdev);
 }
