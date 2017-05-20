@@ -21,8 +21,9 @@ Alan Jowett (alanjo) 19-March-2016
 #include <math.h>
 #include <time.h>
 #include <string.h>
-typedef unsigned long long DWORD64;
+#include "CpuInfo.h"
 
+typedef unsigned long long DWORD64;
 
 unsigned long long __rdtsc()
 {
@@ -58,10 +59,10 @@ double StdDevAsFractionOfMean(DWORD64 * Samples, size_t SampleSize)
 
 double TimeFromTimeSpec(timespec t)
 {
+	// Return time as seconds
 	double time = t.tv_nsec;
 	time /= 1e9;
 	time += t.tv_sec;
-        time /= 1e9;
 	return time;
 }
 
@@ -71,8 +72,22 @@ void ScaleAndPrintResults(timespec Start, timespec End, size_t SampleSize, DWORD
 
 	double queryTime = TimeFromTimeSpec(End) - TimeFromTimeSpec(Start);
 	queryTime *= 1e9;
+        queryTime /= SampleSize;
 	double stdev = StdDevAsFractionOfMean(Samples, SampleSize) * queryTime;
 	printf("%s latency %.1fns STDEV %.1fns\n", Name, queryTime, stdev);
+}
+
+void SetCpuAffinity()
+{
+        int cpu = sched_getcpu();
+        cpu_set_t *cpuSet;
+        size_t cpuSetSize;
+        cpuSetSize = CPU_ALLOC_SIZE(cpu);
+	cpuSet = CPU_ALLOC(cpu);
+        CPU_ZERO_S(cpuSetSize, cpuSet);
+        sched_setaffinity(0, cpuSetSize, cpuSet);
+        printf("Affinitizing to CPU %d\n", cpu);
+        CPU_FREE(cpuSet);
 }
 
 int main(int argc, char ** argv)
@@ -81,6 +96,19 @@ int main(int argc, char ** argv)
 		printf("%s samples_size iterations\n", argv[0]);
 		exit(-1);
 	}
+
+	// Dump the command line args
+	for (int i = 0; i < argc; i++) {
+        	printf("%s ", argv[i]);
+	}
+	printf("\n");
+	printf("CPU Info: Vendor: %s Brand: %s\n", InstructionSet::Vendor().c_str(), InstructionSet::Brand().c_str());
+	if (!InstructionSet::TscInvariant())
+	{
+		printf("CPU doesn't support invariant TSC\n");
+		exit(-1);
+	}
+	SetCpuAffinity();
 
 	size_t sampleSize = atoll(argv[1]);
 	size_t iterations = atol(argv[2]);

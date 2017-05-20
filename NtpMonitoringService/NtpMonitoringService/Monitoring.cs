@@ -11,27 +11,30 @@ namespace NtpMonitoringService
 {
     public partial class Monitoring : ServiceBase
     {
-        struct NtpServer
+        private struct NtpServer
         {
             public string ConfiguredName;
             public IPAddress Address;
             public string ResolvedName;
         }
-        struct Sampler
+        private struct Sampler
         {
             public Process Child;
             public NtpServer Server;
             public ProcessStartInfo StartInfo;
         }
-        StreamWriter Output;
-        static string BaseFileName;
-        static int Hour;
-        static System.Threading.ManualResetEvent Shutdown;
-        static int ChildCount;
-        Dictionary<NtpServer, Task> RunningTasks = new Dictionary<NtpServer, Task>();
-        System.Threading.Timer ConfigRefresh;
+        private StreamWriter Output;
+        private static string BaseFileName;
+        private static string LogFilePath;
+        private static int Hour;
+        private static System.Threading.ManualResetEvent Shutdown;
+        private static int ChildCount;
+        private Dictionary<NtpServer, Task> RunningTasks = new Dictionary<NtpServer, Task>();
+        private System.Threading.Timer ConfigRefresh;
         private object writeLock = new Object();
         private string ConfiguredServiceName;
+        private EventLog Log;
+        private List<Process> ChildProcesses;
 
         public Monitoring(string [] Argv)
         {
@@ -93,7 +96,7 @@ namespace NtpMonitoringService
                         interval = "5000";
                     }
 
-                    EventLog.WriteEntry("Monitoring NTP server: " + server.ConfiguredName + " IPAddress: " + server.Address.ToString());
+                    Log.WriteEntry("Monitoring NTP server: " + server.ConfiguredName + " IPAddress: " + server.Address.ToString());
 
                     Sampler sample = new Sampler();
                     sample.Server = server;
@@ -112,6 +115,10 @@ namespace NtpMonitoringService
                     sample.StartInfo.RedirectStandardOutput = true;
                     sample.StartInfo.UseShellExecute = false;
                     sample.Child = Process.Start(sample.StartInfo);
+                    lock (ChildProcesses)
+                    {
+                        ChildProcesses.Add(sample.Child);
+                    }
                     System.Threading.Interlocked.Increment(ref ChildCount);
                     RunningTasks.Add(server, ReadSampler(sample));
 
@@ -125,6 +132,7 @@ namespace NtpMonitoringService
 
         protected override void OnStart(string[] args)
         {
+            Guid instanceId = Guid.NewGuid();
             string keyName = "SYSTEM\\CurrentControlSet\\Services\\" + ConfiguredServiceName + "\\Config";
             Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(keyName);
             if (key == null)
@@ -133,12 +141,39 @@ namespace NtpMonitoringService
                 Stop();
                 return;
             }
-
+            if (EventLog.SourceExists(ConfiguredServiceName) && EventLog.Exists(ConfiguredServiceName))
+            {
+                Log = new EventLog(ConfiguredServiceName);
+                Log.Source = ConfiguredServiceName;
+            }
+            else
+            {
+                Log = EventLog;
+            }
+            ChildProcesses = new List<Process>();
             ChildCount = 0;
             Output = null;
             Hour = -1;
 
-            BaseFileName = key.GetValue("BasePath").ToString() + "\\" + Guid.NewGuid().ToString() + ".";
+            if (key.GetValue("BasePath") == null)
+            {
+                EventLog.WriteEntry("Missing configuration value: BasePath");
+                Stop();
+                return;
+            }
+            else
+            {
+                BaseFileName = key.GetValue("BasePath").ToString() + "\\" + instanceId.ToString() + ".";
+            }
+
+            if (key.GetValue("LogPath") != null)
+            {
+                LogFilePath = key.GetValue("LogPath").ToString() + "\\" + instanceId.ToString() + ".";
+            }
+            else
+            {
+                LogFilePath = null;
+            }
             Shutdown = new System.Threading.ManualResetEvent(false);
 
             ConfigRefresh = new System.Threading.Timer((object o) => { UpdateServerList(); });
@@ -148,22 +183,28 @@ namespace NtpMonitoringService
         protected override void OnStop()
         {
             ConfigRefresh.Change(System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
-            ConfigRefresh.Dispose();
-            ConfigRefresh = null;
 
             Shutdown.Set();
-
-            Task[] tasks;
             lock (RunningTasks)
             {
-                tasks = new Task[RunningTasks.Values.Count];
-                RunningTasks.Values.CopyTo(tasks, 0);
+                RunningTasks.Clear();
             }
 
-            foreach (Task task in tasks)
+            lock (ChildProcesses)
             {
-                task.Wait();
+                foreach (var Child in ChildProcesses)
+                {
+                    try
+                    {
+                        Child.Kill();
+                    }
+                    catch (Exception)
+                    {
+
+                    }
+                }
             }
+
             if (Output != null)
             {
                 Output.Flush();
@@ -177,12 +218,16 @@ namespace NtpMonitoringService
             {
                 if (Shutdown.WaitOne(0))
                 {
-                    sampler.Child.Kill();
                     System.Threading.Interlocked.Decrement(ref ChildCount);
                     break;
                 }
                 if (sampler.Child.HasExited)
                 {
+                    lock (ChildProcesses)
+                    {
+                        ChildProcesses.Remove(sampler.Child);
+                    }
+
                     lock (RunningTasks)
                     {
                         if (!RunningTasks.ContainsKey(sampler.Server))
@@ -217,7 +262,7 @@ namespace NtpMonitoringService
                         Output.Close();
                     }
                     fileName = BaseFileName + now.Year.ToString("D4") + now.Month.ToString("D2") + now.Day.ToString("D2") + now.Hour.ToString("D2") + now.Minute.ToString("D2") + ".csv";
-                    EventLog.WriteEntry("Writing to file: " + fileName);
+                    Log.WriteEntry("Writing to file: " + fileName);
                     Output = File.CreateText(fileName);
                 }
                 Output.WriteLine(Prefix + "," + Data + "," + Suffix);
@@ -229,6 +274,15 @@ namespace NtpMonitoringService
         {
             Dictionary<IPAddress, string> names = new Dictionary<IPAddress, string>();
             Dictionary<string, Task<IPHostEntry>> resolvers = new Dictionary<string, Task<IPHostEntry>>();
+            DateTime now = DateTime.Now;
+            StreamWriter resolverLog = null;
+            
+            if (LogFilePath != null)
+            {
+                string fileName = LogFilePath + now.Year.ToString("D4") + now.Month.ToString("D2") + now.Day.ToString("D2") + now.Hour.ToString("D2") + ".resolver.csv";
+                resolverLog = new StreamWriter(File.Open(fileName, FileMode.Append, FileAccess.Write, FileShare.ReadWrite));
+            }
+            if (resolverLog != null) resolverLog.WriteLine("Starting name resolution at " + DateTime.Now.ToString());
             foreach (string dnsName in DnsNames)
             {
                 IPAddress ip;
@@ -244,21 +298,40 @@ namespace NtpMonitoringService
 
             foreach (var entry in resolvers)
             {
+                if (resolverLog != null) resolverLog.Write(entry.Key + ",");
                 try
                 {
                     entry.Value.Wait();
                     foreach (var ip in entry.Value.Result.AddressList)
                     {
+                        if (resolverLog != null) resolverLog.Write(ip.ToString() + ",");
                         if (!names.ContainsKey(ip))
                         {
                             names.Add(ip, entry.Key);
                         }
                     }
                 }
-                catch (System.AggregateException)
+                catch (System.AggregateException ex)
                 {
-                    EventLog.WriteEntry("Can't add server: " + entry.Key.ToString());
+                    if (resolverLog != null) resolverLog.Write("FAILED ");
+                    if (ex.InnerException is System.Net.Sockets.SocketException)
+                    {
+                        System.Net.Sockets.SocketException s = (System.Net.Sockets.SocketException)ex.InnerException;
+                        if (resolverLog != null) resolverLog.Write(s.ErrorCode + "," + ex.InnerException.Message);
+                    }
+                    else
+                    {
+                        if (resolverLog != null) resolverLog.Write(ex.InnerException.Message.ToString());
+                    }
                 }
+                if (resolverLog != null) resolverLog.WriteLine();
+            }
+            if (resolverLog != null)
+            {
+                resolverLog.WriteLine("Ending name resolution at " + DateTime.Now.ToString());
+                resolverLog.Flush();
+                resolverLog.Close();
+                resolverLog.Dispose();
             }
             return names;
         }
