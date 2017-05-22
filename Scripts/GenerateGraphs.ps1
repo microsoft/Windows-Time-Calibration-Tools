@@ -1,7 +1,7 @@
 ﻿<#
  
 .SYNOPSIS
-Genera tes a set of charts based on NTP data collected using the Windows Time Calibration Tools.
+Generates a set of charts based on NTP data collected using the Windows Time Calibration Tools.
  
 .DESCRIPTION
 Using Microsoft Calibration Tools and GNUPlot, this script generates a set of charts based on NTP data collected using the Windows Time Calibration Tools.
@@ -10,6 +10,16 @@ Using Microsoft Calibration Tools and GNUPlot, this script generates a set of ch
 GenerateGraphs.ps1 -ServerList time.windows.com -DataLocation c:\NtpMonitoringServiceLogs
 
 Uses a single Time Server target and creates a graph of the time delta and time offset using records produced from NtpMonitoringService. The data collected spans the last day. 
+
+.EXAMPLE
+GenerateGraphs.ps1 Files.txt -DataLocation c:\NtpMonitoringServiceLogs 2
+
+Uses a list form a text file, and createe graphs of the time delta and time offset using records produced from NtpMonitoringService. The data collected spans the last 2 days. 
+
+.EXAMPLE
+GenerateGraphs.ps1 Files.txt c:\NtpMonitoringServiceLogs 2 10
+
+Uses a list form a text file, and createe graphs of the time delta and time offset using records produced from NtpMonitoringService. The data collected spans the last 2 days, but only 10 log files from that point.  By default, as the NtpMonitor service is configured, each files represents an hour. 
 
 .PARAMETER ServerList
 A single Time Server target, or a text file with a list of Time Server targets separated by newlines. 
