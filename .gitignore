@@ -6,3 +6,6 @@
 **/x86
 *.db
 **/.vs
+**/Debug
+*.user
+
