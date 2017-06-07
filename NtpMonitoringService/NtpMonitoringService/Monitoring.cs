@@ -178,7 +178,7 @@ namespace NtpMonitoringService
             Shutdown = new System.Threading.ManualResetEvent(false);
 
             ConfigRefresh = new System.Threading.Timer((object o) => { UpdateServerList(); });
-            ConfigRefresh.Change(TimeSpan.FromSeconds(60), TimeSpan.FromMilliseconds(-1));
+            ConfigRefresh.Change(TimeSpan.FromSeconds(0), TimeSpan.FromMilliseconds(-1));
         }
 
         protected override void OnStop()
