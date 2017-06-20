@@ -9,14 +9,16 @@ $obj = type $file | ConvertFrom-Csv -header time, a1, a2, a3, a4 | sort @{expres
 
 $percentiles = 0.68, 0.95, 0.997 
 
+echo (dir $File).BaseName
+
 $percentiles  | foreach {
     $pp = $obj.count * $_
 
     if($_ -eq [math]::Round($x_)){
         $p = [math]::Round($pp + 1)
-        echo ("The " + $_ + " percentile = " + $obj[$p - 1].a1)
+        echo ("  The " + ($_ * 100)+ " percentile = " + $obj[$p - 1].a1 + "us")
     } else {
-        echo ("The " + $_ + " percentile = " + $obj[$pp - 1].a1)
+        echo (" The " + ($_ * 100) + " percentile = " + $obj[$pp - 1].a1 + "us")
     }
 }
 #sort @{expression={$_.date -as [datetime]}} 

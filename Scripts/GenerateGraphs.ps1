@@ -394,6 +394,8 @@ foreach($Server in $slist)
                 # Plot using Gnuplot, open source plotting project
                 & gnuplot.exe $PlotGP_IP
 
+                Show-Percentiles.ps1 $ServerDif_IP
+
                 if($InputFile)
                 {
                     echo "Copying data to public share" | Out-File $ErrorLog -Append
