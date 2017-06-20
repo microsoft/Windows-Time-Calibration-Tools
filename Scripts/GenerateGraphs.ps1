@@ -27,6 +27,9 @@ A single Time Server target, or a text file with a list of Time Server targets s
 .PARAMETER DataLocation
 Location of data created by the Windows Time Calibration NtpMonitoringServer tool. 
 
+.PARAMETER ReferenceClock
+Name of system which will be used as the reference clock.
+
 .PARAMETER StartTime
 The starting point data should be graphed.  Requires StopTime parameter.  The date is in the form: dd-MM-yyyy HH:mm:ss
 
@@ -58,9 +61,12 @@ Param(
    [int]$Days = 1,
 
    [Parameter(Mandatory=$False, Position=4)]
-   [int]$HoursToDo,
+   [string]$ReferenceClock = "localhost",
 
    [Parameter(Mandatory=$False, Position=5)]
+   [int]$HoursToDo,
+
+   [Parameter(Mandatory=$False, Position=6)]
    [string]$ErrLog,
 
    [Parameter(Mandatory=$False)]
@@ -189,7 +195,7 @@ if($StartTime -eq "")
     echo ("Plotting " + $Days + " days which ammounts to " + $NumFiles + " total CSV files") | Out-File $ErrorLog -Append 
     if  ($HoursToDo -gt 0)
     {
-        $b = Get-ChildItem ($DataLocation + "\*.csv") | sort LastWriteTime | select -last $NumFiles | select -first $HoursToDo
+        $b = Get-ChildItem ($DataLocation + "\*.csv") | sort LastWriteTime | select -last $NumFiles | select -last $HoursToDo
         echo ("referenceing " + $HoursToDo + " days which reduces to " + $b.Count + " total CSV files") | Out-File $ErrorLog -Append
     }
     else
@@ -246,14 +252,15 @@ DebugPrint("Unique data sets:")
 DebugPrint($UniqueDataSets)
 
 DebugPrint("-----------------------------------")
-DebugPrint("Creating Localhost files")
+DebugPrint("Creating Reference data files for " + $ReferenceClock)
 if (Test-Path  ($WorkingDataDir + "\localhost*.*")) { del ($WorkingDataDir + "\localhost*.*") }
 
 foreach($fl in $b)
 {
     $FileGUID = $fl.Name.Substring(1,35)
-    $localhostfile = $WorkingDataDir + "\localhost_" + $FileGUID + ".out"
-    select-string "127.0.0.1" $fl.FullName | select-string -NotMatch TSC_START | foreach {$_.Line} | out-file $localhostfile -Encoding ascii -Append
+    #$localhostfile = $WorkingDataDir + "\localhost_" + $FileGUID + ".out"
+    $localhostfile = $WorkingDataDir + "\" + $ReferenceClock + "_" + $FileGUID + ".out"
+    select-string $ReferenceClock $fl.FullName | select-string -NotMatch TSC_START | foreach {$_.Line} | out-file $localhostfile -Encoding ascii -Append
     $lhf = (Get-ChildItem $localhostfile)
     DebugPrint($lhf.Name + " Size = " + $lhf.Length)
 }
@@ -328,17 +335,21 @@ foreach($Server in $slist)
         $GroupedIP | ForEach-Object {
             DebugPrint("Processing " + $_.Name + " " + $_.Group[0].ResolvedName)
 
-            $ServerOut_IP = $ServerWorkingDir + $SimpleIP + "_" + $_.key + ".out"
+            #$SimpleIP = $_.IP.Replace(":","_")
+
+            $ServerOut_IP = $ServerWorkingDir + $_.Name + "_" + $_.key + ".out"
             $ServerPlot_IP = $ServerWorkingDir + $_.Name + "_plot.dif"
             $ServerDif_IP = $ServerWorkingDir + $_.Name + ".dif"
             $PlotGP_IP = $ServerWorkingDir + $_.Name + ".gp"
             $ServerPng_IP = $ServerGrpahDir + $_.Name + ".png"
             $ServerPlotGNU_IP = $WorkingDataDir.Replace("\", "\\") + "\\" + $Server + $_.Name + "_plot.dif"
-            $localhostfile = $WorkingDataDir + "\localhost_" + $FileGUID + ".out"
+            #$localhostfile = $WorkingDataDir + "\localhost_" + $FileGUID + ".out"
+            $localhostfile = $WorkingDataDir + "\" + $ReferenceClock + "_" + $FileGUID + ".out"
 
             #Created DIF file between localhost and entry using TimeSampleCorrelcation tool 
             DebugPrint("TimeSampleCorrelation DIF: " + $ServerOut_IP +  " " + $localhostfile + "  = " + $ServerDif_IP)
-            TimeSampleCorrelation.exe $ServerOut_IP $localhostfile 0 1 | MedianFilter.exe 2 60 | MedianFilter.exe 3 60 | out-file $ServerDif_IP -Encoding ascii -Append 
+            TimeSampleCorrelation.exe $ServerOut_IP $localhostfile 0 1 | MedianFilter.exe 2 60 | MedianFilter.exe 3 60 |
+             out-file $ServerDif_IP -Encoding ascii -Append 
 
             if((dir $ServerDif_IP).Length -gt 0)
             {
@@ -382,6 +393,8 @@ foreach($Server in $slist)
 
                 # Plot using Gnuplot, open source plotting project
                 & gnuplot.exe $PlotGP_IP
+
+                Show-Percentiles.ps1 $ServerDif_IP
 
                 if($InputFile)
                 {
