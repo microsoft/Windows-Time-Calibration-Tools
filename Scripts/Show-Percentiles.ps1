@@ -21,4 +21,3 @@ $percentiles  | foreach {
         echo (" The " + ($_ * 100) + " percentile = " + $obj[$pp - 1].a1 + "us")
     }
 }
-#sort @{expression={$_.date -as [datetime]}} 
