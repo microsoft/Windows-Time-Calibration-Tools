@@ -27,6 +27,9 @@ A single Time Server target, or a text file with a list of Time Server targets s
 .PARAMETER DataLocation
 Location of data created by the Windows Time Calibration NtpMonitoringServer tool. 
 
+.PARAMETER ReferenceClock
+Name of system which will be used as the reference clock.
+
 .PARAMETER StartTime
 The starting point data should be graphed.  Requires StopTime parameter.  The date is in the form: dd-MM-yyyy HH:mm:ss
 
@@ -58,9 +61,12 @@ Param(
    [int]$Days = 1,
 
    [Parameter(Mandatory=$False, Position=4)]
-   [int]$HoursToDo,
+   [string]$ReferenceClock = "localhost",
 
    [Parameter(Mandatory=$False, Position=5)]
+   [int]$HoursToDo,
+
+   [Parameter(Mandatory=$False, Position=6)]
    [string]$ErrLog,
 
    [Parameter(Mandatory=$False)]
@@ -82,7 +88,7 @@ function DebugPrint
     
     if($ShowWork)
     {
-        $s
+        Write-Host $s
     }
 }
 
@@ -108,6 +114,24 @@ function SimplfyIP
 
 
 }
+
+# Make sure supporting tools are available in the path
+if ((Get-Command gnuplot.exe -ErrorAction SilentlyContinue) -eq $null)
+{
+    echo "Gnuplot.exe not in path or not installed.  You can install from http://gnuplot.info/."
+    exit
+}
+if ((Get-Command MedianFilter.exe -ErrorAction SilentlyContinue) -eq $null)
+{
+    echo "MedianFilter.exe not in path or not installed. You can install from https://github.com/Microsoft/Windows-Time-Calibration-Tools."
+    exit
+}
+if ((Get-Command TimeSampleCorrelation.exe -ErrorAction SilentlyContinue) -eq $null)
+{
+    echo "TimeSampleCorrelation.exe not in path or not installed.  You can install from https://github.com/Microsoft/Windows-Time-Calibration-Tools."
+    exit
+}
+
 
 # Setup directories
 $GraphDataDir = ".\GraphData"
@@ -138,7 +162,7 @@ if(Test-Path $ServerList)
     # Save old data
     $BackupDir = $GraphDataBackupDir + (date).DayOfYear + "-" + (date).Hour + "-" + (date).Minute
     echo ("Backing up old data to  " + $BackupDir) | Out-File $ErrorLog -Append
-    md $BackupDir
+    md $BackupDir > $null
     move ($GraphDataDir + "\*.png") $BackupDir
 
     #flag to move data when we are done.  We only do this when using an input file.
@@ -150,7 +174,6 @@ if(Test-Path $ServerList)
     {
         [System.Array]$slist += $line
     } 
-    DebugPrint($slist)
 }
 else
 {
@@ -158,6 +181,9 @@ else
     $InputFile = $FALSE
     [System.Array]$slist += $ServerList
 }
+
+DebugPrint("List of Severs")
+DebugPrint($slist)
 
 if($StartTime -eq "")
 {
@@ -169,12 +195,12 @@ if($StartTime -eq "")
     echo ("Plotting " + $Days + " days which ammounts to " + $NumFiles + " total CSV files") | Out-File $ErrorLog -Append 
     if  ($HoursToDo -gt 0)
     {
-        $b = gci ($DataLocation + "\*.csv") | sort LastWriteTime | select -last $NumFiles | select -first $HoursToDo
+        $b = Get-ChildItem ($DataLocation + "\*.csv") | sort LastWriteTime | select -last $NumFiles | select -last $HoursToDo
         echo ("referenceing " + $HoursToDo + " days which reduces to " + $b.Count + " total CSV files") | Out-File $ErrorLog -Append
     }
     else
     {
-        $b = gci ($DataLocation + "\*.csv") | sort LastWriteTime | select -last $NumFiles
+        $b = Get-ChildItem ($DataLocation + "\*.csv") | sort LastWriteTime | select -last $NumFiles
     }
 }
 else
@@ -205,8 +231,9 @@ else
     }
 }
 
+DebugPrint("-----------------------------------")
 DebugPrint("List of Files:")
-DebugPrint($b)
+DebugPrint($b | foreach { $b.FullName } )
 
 echo ("Collecting Data") | Out-File $ErrorLog -Append
 #Figure out how many different GUIDs there are as data can't be processed over multiple GUIDs
@@ -220,27 +247,32 @@ foreach ($n in $b)
     }
 }
 
+DebugPrint("-----------------------------------")
 DebugPrint("Unique data sets:")
 DebugPrint($UniqueDataSets)
 
-DebugPrint("Creating Localhost files")
-#NCif (Test-Path  ($localhostfile + "*.*")) { del ($localhostfile + "*.*") }
+DebugPrint("-----------------------------------")
+DebugPrint("Creating Reference data files for " + $ReferenceClock)
+if (Test-Path  ($WorkingDataDir + "\localhost*.*")) { del ($WorkingDataDir + "\localhost*.*") }
 
 foreach($fl in $b)
 {
     $FileGUID = $fl.Name.Substring(1,35)
-    $localhostfile = $WorkingDataDir + "\localhost_" + $FileGUID + ".out"
-    DebugPrint("Localhost file = " + $localhostfile)
-    select-string "127.0.0.1" $fl.FullName | select-string -NotMatch TSC_START | foreach {$_.Line} | out-file $localhostfile -Encoding ascii -Append
-    dir $localhostfile
+    #$localhostfile = $WorkingDataDir + "\localhost_" + $FileGUID + ".out"
+    $localhostfile = $WorkingDataDir + "\" + $ReferenceClock + "_" + $FileGUID + ".out"
+    select-string $ReferenceClock $fl.FullName | select-string -NotMatch TSC_START | foreach {$_.Line} | out-file $localhostfile -Encoding ascii -Append
+    $lhf = (Get-ChildItem $localhostfile)
+    DebugPrint($lhf.Name + " Size = " + $lhf.Length)
 }
 
 foreach($Server in $slist)
 {
+    DebugPrint("-----------------------------------")
     if ($Server.Contains("localhost")) {
         echo ("Skipping data for " + $Server) | Out-File $ErrorLog -Append
     } else {
         echo ("Processing data for " + $Server) | Out-File $ErrorLog -Append
+        DebugPrint("Processing data for " + $Server)
 
         $ServerWorkingDir = $WorkingDataDir + "\" + $Server
         $ServerGrpahDir = $GraphDataDir + "\" + $Server
@@ -266,8 +298,22 @@ foreach($Server in $slist)
 
         $b | foreach {
             $FileGUID = $fl.Name.Substring(1,35)
+            DebugPrint("====> " + $fl.FullName + " searching for " + $Server)
             $GroupedIP = select-string $Server $_.FullName | select-string -NotMatch TSC_START | foreach {
-                 (ConvertFrom-Csv $_.Line -header IP, start, end, time, delay, name, addr, resolvedname) 
+                 $obj = (ConvertFrom-Csv $_.Line -header IP, start, end, time, delay, name, addr, resolvedname) 
+
+                 $index = $obj.resolvedname.IndexOf(".")
+                 if($index -gt 0)
+                 {
+                     $machineName = $obj.resolvedname.Substring(0, $obj.resolvedname.IndexOf("."))
+                 }
+                 else
+                 {
+                     $machineName = $obj.resolvedname
+                 }
+
+                 #DebugPrint("Comparing " + $machineName + " to " + $Server)
+                 if(($obj.IP -eq $Server) -or ($obj.resolvedname.StartsWith($Server) -or ($obj.name -eq $Server) )){ $obj } 
             } | Group-Object -Property IP
 
             $GroupedIP | ForEach-Object {
@@ -275,13 +321,12 @@ foreach($Server in $slist)
                 $_.Group | ForEach-Object {
                     $SimpleIP = $_.IP.Replace(":","_")
                     $ServerOut_IP = $ServerWorkingDir + $SimpleIP + "_" + $FileGUID + ".out"
-                    #DebugPrint("ServerOut_IP = " + $ServerOut_IP)
                     echo ($_.IP + "," + $_.start + "," + $_.end + "," + $_.time + "," + $_.delay) | out-file $ServerOut_IP -Encoding ascii -Append
                 }
             }
 
             DebugPrint("Groupings for " + $Server + " for file " + $_.Name)
-            DebugPrint($GroupedIP)
+            DebugPrint($GroupedIP.Name)
        }
 
 
@@ -290,61 +335,76 @@ foreach($Server in $slist)
         $GroupedIP | ForEach-Object {
             DebugPrint("Processing " + $_.Name + " " + $_.Group[0].ResolvedName)
 
-            $ServerOut_IP = $ServerWorkingDir + $SimpleIP + "_" + $_.key + ".out"
+            #$SimpleIP = $_.IP.Replace(":","_")
+
+            $ServerOut_IP = $ServerWorkingDir + $_.Name + "_" + $_.key + ".out"
             $ServerPlot_IP = $ServerWorkingDir + $_.Name + "_plot.dif"
             $ServerDif_IP = $ServerWorkingDir + $_.Name + ".dif"
             $PlotGP_IP = $ServerWorkingDir + $_.Name + ".gp"
             $ServerPng_IP = $ServerGrpahDir + $_.Name + ".png"
             $ServerPlotGNU_IP = $WorkingDataDir.Replace("\", "\\") + "\\" + $Server + $_.Name + "_plot.dif"
-            $localhostfile = $WorkingDataDir + "\localhost_" + $FileGUID + ".out"
+            #$localhostfile = $WorkingDataDir + "\localhost_" + $FileGUID + ".out"
+            $localhostfile = $WorkingDataDir + "\" + $ReferenceClock + "_" + $FileGUID + ".out"
 
             #Created DIF file between localhost and entry using TimeSampleCorrelcation tool 
             DebugPrint("TimeSampleCorrelation DIF: " + $ServerOut_IP +  " " + $localhostfile + "  = " + $ServerDif_IP)
-            TimeSampleCorrelation.exe $ServerOut_IP $localhostfile 0 1 | MedianFilter.exe 2 60 | MedianFilter.exe 3 60 | out-file $ServerDif_IP -Encoding ascii -Append 
-    
-            (type $ServerDif_IP | ConvertFrom-Csv -header time,a1,a2,a3,a4) | foreach {([datetime]($_.time)).ToString("u") + "," + $_.a3 + "," + $_.a4} | out-file $ServerPlot_IP -Encoding ascii -Append
+            TimeSampleCorrelation.exe $ServerOut_IP $localhostfile 0 1 | MedianFilter.exe 2 60 | MedianFilter.exe 3 60 |
+             out-file $ServerDif_IP -Encoding ascii -Append 
 
-            CreateGP($PlotGP_IP)
-    
-            $setoutput_cmd = "set output '" + $ServerPng_IP + "'"
-            echo $setoutput_cmd | Out-file $PlotGP_IP -Encoding ascii -Append
-
-            $settitle = "set title '" + $Server + " " + $_.Group[0].ResovledName + " " + $_.Name + "' font 'Courier Bold, 35'"
-            echo $settitle | Out-file $PlotGP_IP -Encoding ascii -Append
-
-            # Change Y scale if provided
-            $major = 15000
-            $minor = 5000
-            $range = 15000.0
-
-            if($ScaleFactor -gt 0)
+            if((dir $ServerDif_IP).Length -gt 0)
             {
-                $major = $ScaleFactor * $major
-                $minor = $ScaleFactor * $minor
-                $range = $ScaleFactor * $range
+                DebugPrint("Plotting " + $ServerDif_IP)
+                    
+                (type $ServerDif_IP | ConvertFrom-Csv -header time,a1,a2,a3,a4) | foreach {([datetime]($_.time)).ToString("u") + "," + $_.a3 + "," + $_.a4} | out-file $ServerPlot_IP -Encoding ascii -Append
 
-                if($ShowWork)
+                CreateGP($PlotGP_IP)
+    
+                $setoutput_cmd = "set output '" + $ServerPng_IP + "'"
+                echo $setoutput_cmd | Out-file $PlotGP_IP -Encoding ascii -Append
+
+                $settitle = "set title '" + $Server + " " + $_.Group[0].ResovledName + " " + $_.Name + "' font 'Courier Bold, 35'"
+                echo $settitle | Out-file $PlotGP_IP -Encoding ascii -Append
+
+                # Change Y scale if provided
+                $major = 15000
+                $minor = 5000
+                $range = 15000.0
+
+                if($ScaleFactor -gt 0)
                 {
-                    echo ("Scaling by " + $ScaleFactor)
+                    $major = $ScaleFactor * $major
+                    $minor = $ScaleFactor * $minor
+                    $range = $ScaleFactor * $range
+
+                    if($ShowWork)
+                    {
+                        echo ("Scaling by " + $ScaleFactor)
+                    }
                 }
-            }
 
-            $ytics = "set ytics nomirror axis scale " + $major + " " + $minor
-            echo $ytics | Out-file $PlotGP_IP -Encoding ascii -Append
-            $yrange = "set yrange [" + ($range * -1.0) + ":" + ($range) + "]"
-            echo $yrange | Out-file $PlotGP_IP -Encoding ascii -Append
-            echo 'set ytics add ("+1ms" 1000) add ("-1ms" -1000)' | Out-file $PlotGP_IP -Encoding ascii -Append
+                $ytics = "set ytics nomirror axis scale " + $major + " " + $minor
+                echo $ytics | Out-file $PlotGP_IP -Encoding ascii -Append
+                $yrange = "set yrange [" + ($range * -1.0) + ":" + ($range) + "]"
+                echo $yrange | Out-file $PlotGP_IP -Encoding ascii -Append
+                echo 'set ytics add ("+1ms" 1000) add ("-1ms" -1000)' | Out-file $PlotGP_IP -Encoding ascii -Append
 
 
-            echo ('plot "' + $ServerPlotGNU_IP + '" using 1:3 title "RTT" with lines, "' + $ServerPlotGNU_IP + '" using 1:2 title "UTC delta" with lines') | Out-File $PlotGP_IP -Append -Encoding ascii
+                echo ('plot "' + $ServerPlotGNU_IP + '" using 1:3 title "RTT" with lines, "' + $ServerPlotGNU_IP + '" using 1:2 title "UTC delta" with lines') | Out-File $PlotGP_IP -Append -Encoding ascii
 
-            # Plot using Gnuplot, open source plotting project
-            & gnuplot.exe $PlotGP_IP
+                # Plot using Gnuplot, open source plotting project
+                & gnuplot.exe $PlotGP_IP
 
-            if($InputFile)
-            {
-                echo "Copying data to public share" | Out-File $ErrorLog -Append
-                copy $ServerPng_IP TimeWindowsComData
+                Show-Percentiles.ps1 $ServerDif_IP
+
+                if($InputFile)
+                {
+                    echo "Copying data to public share" | Out-File $ErrorLog -Append
+                    copy $ServerPng_IP TimeWindowsComData
+                }
+            } else {
+                $errinfo = "Error DIF file is zero length for " + $Server + $_.key + " .  Does the localhost file overlap?"
+                DebugPrint($errinfo);
+                echo $errinfo | Out-File $ErrorLog -Append
             }
         }
     }
