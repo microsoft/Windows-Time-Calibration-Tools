@@ -52,7 +52,7 @@ https://github.com/Microsoft/Windows-Time-Calibration-Tools
 
 Param(
    [Parameter(Mandatory=$True,Position=1)]
-   [string]$ServerList,
+   [string]$Name,
 
    [Parameter(Mandatory=$True,Position=2)]
    [string]$DataLocation,
