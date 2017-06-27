@@ -169,4 +169,6 @@ if (-not (test-path $GraphDataBackupDir))  { md $GraphDataBackupDir }
 
         # Plot using Gnuplot, open source plotting project
         & gnuplot.exe $PlotGP_IP
+
+        Show-Percentiles.ps1 $ServerDif_IP
     }
