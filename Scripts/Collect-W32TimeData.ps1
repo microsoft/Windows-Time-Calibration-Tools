@@ -18,7 +18,7 @@ Name of the System Undert Test (SUT) that you will compare to a reference.
 Reference system that represents the clock to compare against. 
 
 .PARAMETER Samples
-Number of Samples to take overall.  Samples occur once a second.
+Number of Samples to take overall.  Samples occur once every two seconds.
 
 .LINK
 https://github.com/Microsoft/Windows-Time-Calibration-Tools
