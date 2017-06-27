@@ -22,6 +22,6 @@ To generate charts and a report based on the NtpMonitor Server Data:
 * Create a directory for you work 
 * Change to that directory
 * Create a text file, serverlist.txt, which contains a list of servers you want to monitor.
-* Create-MonitorCharts.ps1 .\serverlist.txt c:\ntp\logs 7
-	Generates graph for the last 7 days, default is 1 day.
+* Create-MonitorCharts.ps1 .\serverlist.txt localhost c:\ntp\logs 7
+	Generates graph for the last 7 days, default is 1 day.  Uses localhost as the reference clock.
 * Review data in Graph subdirectory
