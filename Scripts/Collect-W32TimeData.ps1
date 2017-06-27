@@ -1,4 +1,31 @@
-﻿Param(
+﻿<#
+ 
+.SYNOPSIS
+Collects data from a system and a reference clock.
+ 
+.DESCRIPTION
+Using data from w32tm between a source and refecnce, the data is collected wiht .out extension appened to the system names.
+ 
+.EXAMPLE
+Collect-W32TimeData.ps1 Source Reference 500
+
+Using data from Collect-W32TimeData, uses data from files Source.out and Reference.out.
+
+.PARAMETER SUT
+Name of the System Undert Test (SUT) that you will compare to a reference.
+
+.PARAMETER ReferenceClockSystem
+Reference system that represents the clock to compare against. 
+
+.PARAMETER Samples
+Number of Samples to take overall.  Samples occur once a second.
+
+.LINK
+https://github.com/Microsoft/Windows-Time-Calibration-Tools
+ 
+#>
+
+Param(
    [Parameter(Mandatory=$True,Position=1)]
    [string]$SUT,
 
