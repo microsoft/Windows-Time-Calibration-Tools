@@ -8,8 +8,8 @@ Installation:
 	* HKLM\System\CurrentControlSet\Services\NtpMonitor\Config
 	 	* BasePath REG_SZ "C:\ntp\logs"
 	 	* BasePath REG_SZ "C:\ntp\resolverlogs"
-* Create directories for logs
-* Create directories for resolverlogs
+* Create directories for logs - this is the NTP data collected by the service
+* Create directories for resolverlogs - these logs help you troubleshoot why data might be missing.
 
 Generating Data from logs:
 
