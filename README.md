@@ -3,7 +3,7 @@ Window Tools for Calibrating Windows Time Service
 
 The set of tools included are designed to measure and calibrate the Windows time (or for that matter any time) service.  It consists of various tools, some of which support the higher level functions.  At a high level, they provide the following functions:
 * *NtpMonitor Service* - Identifies machines to monitor via registry entries which then sends NTP requests.  The service uses regular NTP messages and produces logs.  The log files can be analyze and charted using the GenerateGraphs.ps1 script in the Scripts directly.
-* *Create-MonitorCharts.ps1* - A PowerShell script which produces graphs to display the accuracy again 1ms accuracy.  This tool assume that the source being compared against is local host.  For these graphs to be meaningful, localhost must point to a reliable and accurate time source,such as a GPS device.  Type "help Create-MonitorCharts.ps1 -full" for guidance.
+* *Create-MonitorCharts.ps1* - A PowerShell script which produces graphs to observe the accuracy and troubleshoot issues.  This tool assume that the source being compared against is local host.  For these graphs to be meaningful, localhost must point to a reliable and accurate time source,such as a GPS device.  Type "help Create-MonitorCharts.ps1 -full" for guidance.
 * *Collect-W32TimeData.ps1* - Collects data using W32Time /RDTSC switch between a system under test and another machine who's clock you can use as a reference.
 * *Create-TimeChart.ps1* - Produces a PNG chart from data generated using Collect-W32TimeData
 
@@ -13,7 +13,7 @@ How to use the tools to observe accuracy:
 
 Example Usage:
 
-After adding a server and a reference clock (perhaps your GPS time appliance), you wait for a few hours for data to collect.  After setting up the paths to the powershell tools and GNUPlot, you run "Create-MonitorCharts mySUT myGPSDevice c:\myLogData\logs".  The data will be processed for the last days worth of data, and results output describing the accuracy of various percentiles and a graph in the GraphData directory.  Old data will be backed up.
+After adding a server and a reference clock (perhaps your GPS time appliance), you wait for a few hours for data to collect.  First create a new directory for your data.  After setting up the paths to the powershell tools and GNUPlot, you run "Create-MonitorCharts mySUT myGPSDevice c:\myLogData\logs".  The data will be processed for the last days worth of data, and results output describing the accuracy of various percentiles and a graph in the GraphData directory.  Old data will be backed up.
 
 
 2. If you don't want to install the service, or simply want to measure a single machine, you can generate data using W32Time.  The Collect-W32TimeData simplifies the collection, which you can then use Create-TimeChart to create a chart and summary information.  This method is good to run shorter term tests, though you can set the number of samples to long periods.  
