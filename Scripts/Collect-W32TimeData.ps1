@@ -18,7 +18,7 @@ Name of the System Undert Test (SUT) that you will compare to a reference.
 Reference system that represents the clock to compare against. 
 
 .PARAMETER Samples
-Number of Samples to take overall.  Samples occur once every two seconds.
+Number of Samples to take overall.  Samples occur once every second.
 
 .LINK
 https://github.com/Microsoft/Windows-Time-Calibration-Tools
@@ -43,9 +43,9 @@ $SUTDataPre = $SUT + "_pre" + ".out"
 $ReferenceClockSystemDataPre = $ReferenceClockSystem + "_pre" + ".out"
 
 $d = get-location
-create-time
-$SUT_job = [scriptblock]::Create("cd " + $d + "; & w32tm /stripchart /computer:" + $ReferenceClockSystem + " /rdtsc /samples:" + $Samples + " > " + $ReferenceClockSystemDataPre )
-$Ref_job = [scriptblock]::Create("cd " + $d + "; & w32tm /stripchart /computer:" + $SUT +                  " /rdtsc /samples:" + $Samples + " > " + $SUTDataPre )
+
+$SUT_job = [scriptblock]::Create("cd " + $d + "; & w32tm /stripchart /computer:" + $ReferenceClockSystem + " /rdtsc /period:1 /samples:" + $Samples + " > " + $ReferenceClockSystemDataPre )
+$Ref_job = [scriptblock]::Create("cd " + $d + "; & w32tm /stripchart /computer:" + $SUT +                  " /rdtsc /period:1 /samples:" + $Samples + " > " + $SUTDataPre )
 
 $j1 = start-job -Name j1 -ScriptBlock $SUT_job 
 $j2 = start-job -Name j2 -ScriptBlock $Ref_job
@@ -60,7 +60,7 @@ echo "Data collected"
 
 #w32tm is in seconds, need to convert to microseconds
 
-Convert-ColumnByScale.ps1 $SUTDataPre create> $SUTData
+Convert-ColumnByScale.ps1 $SUTDataPre > $SUTData
 Convert-ColumnByScale.ps1 $ReferenceClockSystemDataPre > $ReferenceClockSystemData
 
 remove-job -Name j1,j2
