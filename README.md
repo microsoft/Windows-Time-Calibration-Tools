@@ -20,4 +20,4 @@ After adding a server and a reference clock (perhaps your GPS time appliance), y
 
 Example Usage:
 
-First you must collect the data for both the system you want to analyze and a reference, (again your GPS time appliance).  Use "Collect-W32TimeData mySUT myGPSDevice 500", to automatically invoke w32tm as powershell jobs for both the SUT and reference clock.  This examples collects 500 samples, once every two seconds.  Once the data is collected, you can generate a chart and summary data by running "Create-TimeChart mySUT myGPSDevice"
+First you must collect the data for both the system you want to analyze and a reference, (again your GPS time appliance).  Use "Collect-W32TimeData mySUT myGPSDevice 500", to automatically invoke w32tm as powershell jobs for both the SUT and reference clock.  This examples collects 500 samples, once every  second.  Once the data is collected, you can generate a chart and summary data by running "Create-TimeChart mySUT myGPSDevice"
