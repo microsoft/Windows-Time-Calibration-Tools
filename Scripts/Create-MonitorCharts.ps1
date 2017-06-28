@@ -7,17 +7,17 @@ Generates a set of charts based on NTP data collected using the Windows Time Cal
 Using Microsoft Calibration Tools and GNUPlot, this script generates a set of charts based on NTP data collected using the Windows Time Calibration Tools.
  
 .EXAMPLE
-GenerateGraphs.ps1 -ServerList time.windows.com -DataLocation c:\NtpMonitoringServiceLogs
+Create-MonitorCharts.ps1 -ServerList time.windows.com -DataLocation c:\NtpMonitoringServiceLogs
 
 Uses a single Time Server target and creates a graph of the time delta and time offset using records produced from NtpMonitoringService. The data collected spans the last day. 
 
 .EXAMPLE
-GenerateGraphs.ps1 Files.txt -DataLocation c:\NtpMonitoringServiceLogs 2
+Create-MonitorCharts.ps1 Files.txt -DataLocation c:\NtpMonitoringServiceLogs 2
 
 Uses a list form a text file, and createe graphs of the time delta and time offset using records produced from NtpMonitoringService. The data collected spans the last 2 days. 
 
 .EXAMPLE
-GenerateGraphs.ps1 Files.txt c:\NtpMonitoringServiceLogs 2 10
+Create-MonitorCharts.ps1 Files.txt c:\NtpMonitoringServiceLogs 2 10
 
 Uses a list form a text file, and createe graphs of the time delta and time offset using records produced from NtpMonitoringService. The data collected spans the last 2 days, but only 10 log files from that point.  By default, as the NtpMonitor service is configured, each files represents an hour. 
 
@@ -54,14 +54,14 @@ Param(
    [Parameter(Mandatory=$True,Position=1)]
    [string]$ServerList,
 
-   [Parameter(Mandatory=$True,Position=2)]
+   [Parameter(Mandatory=$True, Position=2)]
+   [string]$ReferenceClock = "localhost",
+
+   [Parameter(Mandatory=$True,Position=3)]
    [string]$DataLocation,
-	
-   [Parameter(Mandatory=$False, Position=3)]
-   [int]$Days = 1,
 
    [Parameter(Mandatory=$False, Position=4)]
-   [string]$ReferenceClock = "localhost",
+   [int]$Days = 1,
 
    [Parameter(Mandatory=$False, Position=5)]
    [int]$HoursToDo,
