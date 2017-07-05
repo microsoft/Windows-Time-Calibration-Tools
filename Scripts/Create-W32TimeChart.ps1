@@ -74,6 +74,14 @@ function CreateGP
     echo 'set tmargin 5' | Out-file $outfile -Encoding ascii -Append
 }
 
+$r = Test-WTCTDepedencies.ps1
+if($r -ne $True)
+{
+    echo $r[0]
+    echo "Setup reqruiemtns not met.  Please view the Readme.MD on https://github.com/Microsoft/Windows-Time-Calibration-Tools for more info."
+    return $False
+}
+
 # Setup directories
 $GraphDataDir = ".\GraphData"
 $GraphDataBackupDir = ".\GraphData\backup\"
@@ -85,8 +93,8 @@ if (-not (test-path $WorkingDataDir))  { md $WorkingDataDir }
 if (-not (test-path $GraphDataDir))  { md $GraphDataDir }
 if (-not (test-path $GraphDataBackupDir))  { md $GraphDataBackupDir }
 
-        $ServerWorkingDir = $WorkingDataDir + "\" + $Server
-        $ServerGrpahDir = $GraphDataDir + "\" + $Server
+    $ServerWorkingDir = $WorkingDataDir + "\" + $Server
+    $ServerGrpahDir = $GraphDataDir + "\" + $Server
 
     if($Key -ne "")
     {
@@ -95,6 +103,13 @@ if (-not (test-path $GraphDataBackupDir))  { md $GraphDataBackupDir }
     else
     {
         $ServerOut_IP = $ServerWorkingDir + $Name + ".out"
+    }
+
+    #Validation check of SUT machines files.
+    if (-not (test-path $ServerOut_IP))  
+    {
+        echo ("Missing .out data file(s) for System Under Test " + $Name) 
+        return $false
     }
 
     #$ServerOut_IP = $ServerWorkingDir + $Name + "_" + $Key + ".out"
@@ -121,6 +136,14 @@ if (-not (test-path $GraphDataBackupDir))  { md $GraphDataBackupDir }
     {
         $localhostfile = $WorkingDataDir + "\" + $ReferenceClock + ".out";
     }
+
+    #Validation check of reference clock machine..
+    if (-not (test-path $localhostfile))  
+    {
+        echo ("Missing .out data file(s) for Reference clock " + $ReferenceClock) 
+        return $false
+    }
+
 
     #Created DIF file between localhost and entry using TimeSampleCorrelcation tool 
     DebugPrint("TimeSampleCorrelation DIF: " + $ServerOut_IP +  " " + $localhostfile + "  = " + $ServerDif_IP)

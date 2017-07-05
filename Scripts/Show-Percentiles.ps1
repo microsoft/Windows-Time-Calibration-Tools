@@ -5,7 +5,7 @@ Param(
    [string]$File
 )
 
-$obj = type $file | ConvertFrom-Csv -header time, a1, a2, a3, a4 | sort @{expression={$_.a1 -as [double]} }
+$obj = type $file | ConvertFrom-Csv -header time, a1, a2, a3, a4 | sort @{expression={[math]::Abs($_.a1) -as [double]} }
 
 $percentiles = 0.68, 0.95, 0.997 
 

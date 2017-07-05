@@ -115,23 +115,13 @@ function SimplfyIP
 
 }
 
-# Make sure supporting tools are available in the path
-if ((Get-Command gnuplot.exe -ErrorAction SilentlyContinue) -eq $null)
+$r = Test-WTCTDepedencies.ps1
+if($r -ne $True)
 {
-    echo "Gnuplot.exe not in path or not installed.  You can install from http://gnuplot.info/."
-    exit
+    echo $r[0]
+    echo "Setup reqruiemtns not met.  Please view the Readme.MD on https://github.com/Microsoft/Windows-Time-Calibration-Tools for more info."
+    return $False
 }
-if ((Get-Command MedianFilter.exe -ErrorAction SilentlyContinue) -eq $null)
-{
-    echo "MedianFilter.exe not in path or not installed. You can install from https://github.com/Microsoft/Windows-Time-Calibration-Tools."
-    exit
-}
-if ((Get-Command TimeSampleCorrelation.exe -ErrorAction SilentlyContinue) -eq $null)
-{
-    echo "TimeSampleCorrelation.exe not in path or not installed.  You can install from https://github.com/Microsoft/Windows-Time-Calibration-Tools."
-    exit
-}
-
 
 # Setup directories
 $GraphDataDir = ".\GraphData"
@@ -312,8 +302,8 @@ foreach($Server in $slist)
                      $machineName = $obj.resolvedname
                  }
 
-                 #DebugPrint("Comparing " + $machineName + " to " + $Server)
-                 if(($obj.IP -eq $Server) -or ($obj.resolvedname.StartsWith($Server) -or ($obj.name -eq $Server) )){ $obj } 
+                 #Does the line in the CSV contain the comptuer name we are looking for.  It can be in several places.
+                 if(($obj.IP -eq $Server) -or ($obj.resolvedname.StartsWith($Server,"CurrentCultureIgnoreCase") -or ($obj.name -eq $Server) )){ $obj } 
             } | Group-Object -Property IP
 
             $GroupedIP | ForEach-Object {
