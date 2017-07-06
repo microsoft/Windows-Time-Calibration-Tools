@@ -31,5 +31,5 @@ else
 
 echo ("Ref beg: " + $ref_beg.ToString("u"))
 echo ("  Sut beg: " + $sut_beg.ToString("u"))
-echo ("  Sut end: " + $sut_beg.ToString("u"))
+echo ("  Sut end: " + $sut_end.ToString("u"))
 echo ("Ref end: " + $ref_end.ToString("u"))
