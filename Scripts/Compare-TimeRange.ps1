@@ -17,16 +17,16 @@ $t2h = ConvertFrom-csv (type $f2 -head 5 | select -last 1 ) -header a,b,c,d
 if($startcol -eq 0)
 {
     $sut_beg = [DateTime]::FromFileTime($t1h.c)
-    $sut_end = [DateTime]::FromFileTime($t2h.c)
-    $ref_beg = [DateTime]::FromFileTime($t2t.c)
-    $ref_end = [DateTime]::FromFileTime($t1t.c)
+    $sut_end = [DateTime]::FromFileTime($t1t.c)
+    $ref_beg = [DateTime]::FromFileTime($t2h.c)
+    $ref_end = [DateTime]::FromFileTime($t2t.c)
 }
 else
 {
     $sut_beg = [DateTime]::FromFileTime($t1h.d)
-    $sut_end = [DateTime]::FromFileTime($t2h.d)
-    $ref_beg = [DateTime]::FromFileTime($t2t.d)
-    $ref_end = [DateTime]::FromFileTime($t1t.d)
+    $sut_end = [DateTime]::FromFileTime($t1t.d)
+    $ref_beg = [DateTime]::FromFileTime($t2h.d)
+    $ref_end = [DateTime]::FromFileTime($t2t.d)
 }
 
 echo ("Ref beg: " + $ref_beg.ToString("u"))
