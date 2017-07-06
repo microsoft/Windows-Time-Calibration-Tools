@@ -35,6 +35,10 @@ Param(
    [Parameter(Mandatory=$False,Position=4)]
    [string]$FileGUID = "",
 
+
+   [Parameter(Mandatory=$False)]
+   [Decimal]$TSCOffset = 0,
+
    #[Parameter(Mandatory=$False,Position=5)]
    #[string]$WorkingDataDir = ".",
 
@@ -147,7 +151,7 @@ if (-not (test-path $GraphDataBackupDir))  { md $GraphDataBackupDir }
 
     #Created DIF file between localhost and entry using TimeSampleCorrelcation tool 
     DebugPrint("TimeSampleCorrelation DIF: " + $ServerOut_IP +  " " + $localhostfile + "  = " + $ServerDif_IP)
-    TimeSampleCorrelation.exe $ServerOut_IP $localhostfile 0 0 | MedianFilter.exe 2 60 | MedianFilter.exe 3 60 |
+    TimeSampleCorrelation.exe $ServerOut_IP $localhostfile $TSCOffset 0 | MedianFilter.exe 2 60 | MedianFilter.exe 3 60 |
         out-file $ServerDif_IP -Encoding ascii -Append 
 
     if((dir $ServerDif_IP).Length -gt 0)
