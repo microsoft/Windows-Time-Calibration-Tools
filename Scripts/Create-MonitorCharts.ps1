@@ -286,6 +286,8 @@ foreach($Server in $slist)
         # Clear out any old data for this server.
         if (Test-Path ($ServerWorkingDir + "*.*") ) { del ($ServerWorkingDir + "*.*") }
 
+        $AllGroups = @()
+
         $b | foreach {
             $FileGUID = $fl.Name.Substring(1,35)
             DebugPrint("====> " + $fl.FullName + " searching for " + $Server)
@@ -313,26 +315,41 @@ foreach($Server in $slist)
                     $ServerOut_IP = $ServerWorkingDir + $SimpleIP + "_" + $FileGUID + ".out"
                     echo ($_.IP + "," + $_.start + "," + $_.end + "," + $_.time + "," + $_.delay) | out-file $ServerOut_IP -Encoding ascii -Append
                 }
+
+                $GroupSummary = New-Object PSObject
+                Add-Member -InputObject $GroupSummary -MemberType NoteProperty -Name SUTName -Value $_.Name
+                Add-Member -InputObject $GroupSummary -MemberType NoteProperty -Name key -Value $FileGUID
+                Add-Member -InputObject $GroupSummary -MemberType NoteProperty -Name ResolveName -Value $GroupedIP.Group[0].ResolvedName
+
+                $AllGroups += $GroupSummary 
             }
 
-            DebugPrint("Groupings for " + $Server + " for file " + $_.Name)
-            DebugPrint($GroupedIP.Name)
+
+            if($GroupedIP.Count -ne 0)
+            {
+                DebugPrint("Groupings for " + $Server + " for file " + $_.Name)
+                DebugPrint($GroupedIP.Name)
+
+            }
        }
 
+       DebugPrint("All groups")
+       DebugPrint($AllGroups | Select -Unique)
 
         #if (Test-Path $ServerDif ) { del ($ServerDif + "*.*") }
 
-        $GroupedIP | ForEach-Object {
-            DebugPrint("Processing " + $_.Name + " " + $_.Group[0].ResolvedName)
+#        $GroupedIP | ForEach-Object {
+         $AllGroups | Select -Unique | ForEach-Object {
+            DebugPrint("Processing " + $_.SUTName + " " + $_.ResolvedName)
 
             #$SimpleIP = $_.IP.Replace(":","_")
 
-            $ServerOut_IP = $ServerWorkingDir + $_.Name + "_" + $_.key + ".out"
-            $ServerPlot_IP = $ServerWorkingDir + $_.Name + "_plot.dif"
-            $ServerDif_IP = $ServerWorkingDir + $_.Name + ".dif"
-            $PlotGP_IP = $ServerWorkingDir + $_.Name + ".gp"
-            $ServerPng_IP = $ServerGrpahDir + $_.Name + ".png"
-            $ServerPlotGNU_IP = $WorkingDataDir.Replace("\", "\\") + "\\" + $Server + $_.Name + "_plot.dif"
+            $ServerOut_IP = $ServerWorkingDir + $_.SUTName + "_" + $_.key + ".out"
+            $ServerPlot_IP = $ServerWorkingDir + $_.SUTName + "_plot.dif"
+            $ServerDif_IP = $ServerWorkingDir + $_.SUTName + ".dif"
+            $PlotGP_IP = $ServerWorkingDir + $_.SUTName + ".gp"
+            $ServerPng_IP = $ServerGrpahDir + $_.SUTName + ".png"
+            $ServerPlotGNU_IP = $WorkingDataDir.Replace("\", "\\") + "\\" + $Server + $_.SUTName + "_plot.dif"
             #$localhostfile = $WorkingDataDir + "\localhost_" + $FileGUID + ".out"
             $localhostfile = $WorkingDataDir + "\" + $ReferenceClock + "_" + $FileGUID + ".out"
 
@@ -352,7 +369,7 @@ foreach($Server in $slist)
                 $setoutput_cmd = "set output '" + $ServerPng_IP + "'"
                 echo $setoutput_cmd | Out-file $PlotGP_IP -Encoding ascii -Append
 
-                $settitle = "set title '" + $Server + " " + $_.Group[0].ResovledName + " " + $_.Name + "' font 'Courier Bold, 35'"
+                $settitle = "set title '" + $Server + " " + $_.ResovledName + " " + $_.SUTName + "' font 'Courier Bold, 35'"
                 echo $settitle | Out-file $PlotGP_IP -Encoding ascii -Append
 
                 # Change Y scale if provided
