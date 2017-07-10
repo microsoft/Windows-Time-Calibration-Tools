@@ -16,8 +16,8 @@ $percentiles  | foreach {
 
     if($_ -eq [math]::Round($x_)){
         $p = [math]::Round($pp + 1)
-        echo ("  The " + ($_ * 100)+ "th percentile = " + ([math]::Abs($obj[$p - 1].a1) + "us")
+        echo ("  The " + ($_ * 100)+ "th percentile = " + ([math]::Abs($obj[$p - 1].a1)) + "us")
     } else {
-        echo (" The " + ($_ * 100) + "th percentile = " + ([math]::Abs($obj[$pp - 1].a1) + "us")
+        echo (" The " + ($_ * 100) + "th percentile = " + ([math]::Abs($obj[$pp - 1].a1)) + "us")
     }
 }
