@@ -7,17 +7,17 @@ Generates a set of charts based on NTP data collected using the Windows Time Cal
 Using Microsoft Calibration Tools and GNUPlot, this script generates a set of charts based on NTP data collected using the Windows Time Calibration Tools.
  
 .EXAMPLE
-GenerateGraphs.ps1 -ServerList time.windows.com -DataLocation c:\NtpMonitoringServiceLogs
+Create-MonitorCharts.ps1 -ServerList time.windows.com -DataLocation c:\NtpMonitoringServiceLogs
 
 Uses a single Time Server target and creates a graph of the time delta and time offset using records produced from NtpMonitoringService. The data collected spans the last day. 
 
 .EXAMPLE
-GenerateGraphs.ps1 Files.txt -DataLocation c:\NtpMonitoringServiceLogs 2
+Create-MonitorCharts.ps1 Files.txt -DataLocation c:\NtpMonitoringServiceLogs 2
 
 Uses a list form a text file, and createe graphs of the time delta and time offset using records produced from NtpMonitoringService. The data collected spans the last 2 days. 
 
 .EXAMPLE
-GenerateGraphs.ps1 Files.txt c:\NtpMonitoringServiceLogs 2 10
+Create-MonitorCharts.ps1 Files.txt c:\NtpMonitoringServiceLogs 2 10
 
 Uses a list form a text file, and createe graphs of the time delta and time offset using records produced from NtpMonitoringService. The data collected spans the last 2 days, but only 10 log files from that point.  By default, as the NtpMonitor service is configured, each files represents an hour. 
 
@@ -54,14 +54,14 @@ Param(
    [Parameter(Mandatory=$True,Position=1)]
    [string]$ServerList,
 
-   [Parameter(Mandatory=$True,Position=2)]
+   [Parameter(Mandatory=$True, Position=2)]
+   [string]$ReferenceClock = "localhost",
+
+   [Parameter(Mandatory=$True,Position=3)]
    [string]$DataLocation,
-	
-   [Parameter(Mandatory=$False, Position=3)]
-   [int]$Days = 1,
 
    [Parameter(Mandatory=$False, Position=4)]
-   [string]$ReferenceClock = "localhost",
+   [int]$Days = 1,
 
    [Parameter(Mandatory=$False, Position=5)]
    [int]$HoursToDo,
@@ -115,23 +115,13 @@ function SimplfyIP
 
 }
 
-# Make sure supporting tools are available in the path
-if ((Get-Command gnuplot.exe -ErrorAction SilentlyContinue) -eq $null)
+$r = Test-WTCTDepedencies.ps1
+if($r -ne $True)
 {
-    echo "Gnuplot.exe not in path or not installed.  You can install from http://gnuplot.info/."
-    exit
+    echo $r[0]
+    echo "Setup reqruiemtns not met.  Please view the Readme.MD on https://github.com/Microsoft/Windows-Time-Calibration-Tools for more info."
+    return $False
 }
-if ((Get-Command MedianFilter.exe -ErrorAction SilentlyContinue) -eq $null)
-{
-    echo "MedianFilter.exe not in path or not installed. You can install from https://github.com/Microsoft/Windows-Time-Calibration-Tools."
-    exit
-}
-if ((Get-Command TimeSampleCorrelation.exe -ErrorAction SilentlyContinue) -eq $null)
-{
-    echo "TimeSampleCorrelation.exe not in path or not installed.  You can install from https://github.com/Microsoft/Windows-Time-Calibration-Tools."
-    exit
-}
-
 
 # Setup directories
 $GraphDataDir = ".\GraphData"
@@ -296,6 +286,8 @@ foreach($Server in $slist)
         # Clear out any old data for this server.
         if (Test-Path ($ServerWorkingDir + "*.*") ) { del ($ServerWorkingDir + "*.*") }
 
+        $AllGroups = @()
+
         $b | foreach {
             $FileGUID = $fl.Name.Substring(1,35)
             DebugPrint("====> " + $fl.FullName + " searching for " + $Server)
@@ -312,8 +304,8 @@ foreach($Server in $slist)
                      $machineName = $obj.resolvedname
                  }
 
-                 #DebugPrint("Comparing " + $machineName + " to " + $Server)
-                 if(($obj.IP -eq $Server) -or ($obj.resolvedname.StartsWith($Server) -or ($obj.name -eq $Server) )){ $obj } 
+                 #Does the line in the CSV contain the comptuer name we are looking for.  It can be in several places.
+                 if(($obj.IP -eq $Server) -or ($obj.resolvedname.StartsWith($Server,"CurrentCultureIgnoreCase") -or ($obj.name -eq $Server) )){ $obj } 
             } | Group-Object -Property IP
 
             $GroupedIP | ForEach-Object {
@@ -323,26 +315,41 @@ foreach($Server in $slist)
                     $ServerOut_IP = $ServerWorkingDir + $SimpleIP + "_" + $FileGUID + ".out"
                     echo ($_.IP + "," + $_.start + "," + $_.end + "," + $_.time + "," + $_.delay) | out-file $ServerOut_IP -Encoding ascii -Append
                 }
+
+                $GroupSummary = New-Object PSObject
+                Add-Member -InputObject $GroupSummary -MemberType NoteProperty -Name SUTName -Value $_.Name
+                Add-Member -InputObject $GroupSummary -MemberType NoteProperty -Name key -Value $FileGUID
+                Add-Member -InputObject $GroupSummary -MemberType NoteProperty -Name ResolveName -Value $GroupedIP.Group[0].ResolvedName
+
+                $AllGroups += $GroupSummary 
             }
 
-            DebugPrint("Groupings for " + $Server + " for file " + $_.Name)
-            DebugPrint($GroupedIP.Name)
+
+            if($GroupedIP.Count -ne 0)
+            {
+                DebugPrint("Groupings for " + $Server + " for file " + $_.Name)
+                DebugPrint($GroupedIP.Name)
+
+            }
        }
 
+       DebugPrint("All groups")
+       DebugPrint($AllGroups | Select -Unique)
 
         #if (Test-Path $ServerDif ) { del ($ServerDif + "*.*") }
 
-        $GroupedIP | ForEach-Object {
-            DebugPrint("Processing " + $_.Name + " " + $_.Group[0].ResolvedName)
+#        $GroupedIP | ForEach-Object {
+         $AllGroups | Select -Unique | ForEach-Object {
+            DebugPrint("Processing " + $_.SUTName + " " + $_.ResolvedName)
 
             #$SimpleIP = $_.IP.Replace(":","_")
 
-            $ServerOut_IP = $ServerWorkingDir + $_.Name + "_" + $_.key + ".out"
-            $ServerPlot_IP = $ServerWorkingDir + $_.Name + "_plot.dif"
-            $ServerDif_IP = $ServerWorkingDir + $_.Name + ".dif"
-            $PlotGP_IP = $ServerWorkingDir + $_.Name + ".gp"
-            $ServerPng_IP = $ServerGrpahDir + $_.Name + ".png"
-            $ServerPlotGNU_IP = $WorkingDataDir.Replace("\", "\\") + "\\" + $Server + $_.Name + "_plot.dif"
+            $ServerOut_IP = $ServerWorkingDir + $_.SUTName + "_" + $_.key + ".out"
+            $ServerPlot_IP = $ServerWorkingDir + $_.SUTName + "_plot.dif"
+            $ServerDif_IP = $ServerWorkingDir + $_.SUTName + ".dif"
+            $PlotGP_IP = $ServerWorkingDir + $_.SUTName + ".gp"
+            $ServerPng_IP = $ServerGrpahDir + $_.SUTName + ".png"
+            $ServerPlotGNU_IP = $WorkingDataDir.Replace("\", "\\") + "\\" + $Server + $_.SUTName + "_plot.dif"
             #$localhostfile = $WorkingDataDir + "\localhost_" + $FileGUID + ".out"
             $localhostfile = $WorkingDataDir + "\" + $ReferenceClock + "_" + $FileGUID + ".out"
 
@@ -362,7 +369,7 @@ foreach($Server in $slist)
                 $setoutput_cmd = "set output '" + $ServerPng_IP + "'"
                 echo $setoutput_cmd | Out-file $PlotGP_IP -Encoding ascii -Append
 
-                $settitle = "set title '" + $Server + " " + $_.Group[0].ResovledName + " " + $_.Name + "' font 'Courier Bold, 35'"
+                $settitle = "set title '" + $Server + " " + $_.ResovledName + " " + $_.SUTName + "' font 'Courier Bold, 35'"
                 echo $settitle | Out-file $PlotGP_IP -Encoding ascii -Append
 
                 # Change Y scale if provided
