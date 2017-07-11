@@ -1,10 +1,10 @@
 ﻿<#
  
 .SYNOPSIS
-Collects data from a system and a reference clock.
+Collects data from a system and a reference clock using W32tm.
  
 .DESCRIPTION
-Using data from w32tm between a source and refecnce, the data is collected wiht .out extension appened to the system names.
+Using data from w32tm between a source and refecnce, the data is collected and saved with a .out extension appened to the system names.
  
 .EXAMPLE
 Collect-W32TimeData.ps1 Source Reference 500
@@ -44,8 +44,8 @@ $ReferenceClockSystemDataPre = $ReferenceClockSystem + "_pre" + ".out"
 
 $d = get-location
 
-$SUT_job = [scriptblock]::Create("cd " + $d + "; & w32tm /stripchart /computer:" + $ReferenceClockSystem + " /rdtsc /period:1 /samples:" + $Samples + " > " + $ReferenceClockSystemDataPre )
-$Ref_job = [scriptblock]::Create("cd " + $d + "; & w32tm /stripchart /computer:" + $SUT +                  " /rdtsc /period:1 /samples:" + $Samples + " > " + $SUTDataPre )
+$Ref_job = [scriptblock]::Create("cd " + $d + "; & w32tm /stripchart /computer:" + $ReferenceClockSystem + " /rdtsc /period:1 /samples:" + $Samples + " > " + $ReferenceClockSystemDataPre )
+$SUT_job = [scriptblock]::Create("cd " + $d + "; & w32tm /stripchart /computer:" + $SUT +                  " /rdtsc /period:1 /samples:" + $Samples + " > " + $SUTDataPre )
 
 $j1 = start-job -Name j1 -ScriptBlock $SUT_job 
 $j2 = start-job -Name j2 -ScriptBlock $Ref_job

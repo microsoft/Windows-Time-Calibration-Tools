@@ -1,54 +1,26 @@
 ﻿<#
  
 .SYNOPSIS
-Generates a set of charts based on NTP data collected using the Windows Time Calibration Tools.
+Generates a chart based on a data from collected with Collect-TimeData.ps1 or Colelct-W32TimeData.ps1.
  
 .DESCRIPTION
-Using Microsoft Calibration Tools and GNUPlot, this script generates a set of charts based on NTP data collected using the Windows Time Calibration Tools.
+Using data from w32tm or OsTimeSampler between a source and refecnce, the data is filtered and charted.  A summary is also printed for 3 percentiles.  The data can be collected manually using w32tm and OSTimeSampler, or the powershell scripts Collect-W32TimeData.ps1 and Collect-TimeData.ps1 can help automate the process.
  
 .EXAMPLE
-GenerateGraphs.ps1 -ServerList time.windows.com -DataLocation c:\NtpMonitoringServiceLogs
+Create-W32TimeChart.ps1 Source Reference
 
-Uses a single Time Server target and creates a graph of the time delta and time offset using records produced from NtpMonitoringService. The data collected spans the last day. 
+Using data from Collect-W32TimeData, uses data from files Source.out and Reference.out.
 
-.EXAMPLE
-GenerateGraphs.ps1 Files.txt -DataLocation c:\NtpMonitoringServiceLogs 2
-
-Uses a list form a text file, and createe graphs of the time delta and time offset using records produced from NtpMonitoringService. The data collected spans the last 2 days. 
-
-.EXAMPLE
-GenerateGraphs.ps1 Files.txt c:\NtpMonitoringServiceLogs 2 10
-
-Uses a list form a text file, and createe graphs of the time delta and time offset using records produced from NtpMonitoringService. The data collected spans the last 2 days, but only 10 log files from that point.  By default, as the NtpMonitor service is configured, each files represents an hour. 
-
-.PARAMETER ServerList
-A single Time Server target, or a text file with a list of Time Server targets separated by newlines. 
-
-.PARAMETER DataLocation
-Location of data created by the Windows Time Calibration NtpMonitoringServer tool. 
+.PARAMETER Name
+Name of the System Undert Test (SUT) that you will compare to a reference.
 
 .PARAMETER ReferenceClock
-Name of system which will be used as the reference clock.
+Reference system that represents the clock to compare against. 
 
-.PARAMETER StartTime
-The starting point data should be graphed.  Requires StopTime parameter.  The date is in the form: dd-MM-yyyy HH:mm:ss
-
-.PARAMETER StopTime
-The stopping point data should be graphed.  Request the StartTime parameter.  The date is in the form: dd-MM-yyyy HH:mm:ss
-
-
-.NOTES
-GraphData and WorkingData directories are created and used for the data temp working space and the final charts as .png.
-
-Path must include Cadilibration tools, GNUPlot, and most likely this scripting tool.
- 
 .LINK
 https://github.com/Microsoft/Windows-Time-Calibration-Tools
  
 #>
-
-# PS C:\>$T = New-JobTrigger -Weekly -At "9:00 PM" -DaysOfWeek Monday -WeeksInterval 2
-# PS C:\>Register-ScheduledJob -Name "UpdateVersion" -FilePath "\\Srv01\Scripts\UpdateVersion.ps1" -Trigger $T -ScheduledJobOption $O
 
 Param(
    [Parameter(Mandatory=$True,Position=1)]
@@ -57,14 +29,15 @@ Param(
    [Parameter(Mandatory=$True,Position=2)]
    [string]$ReferenceClock,
 
-   [Parameter(Mandatory=$True,Position=3)]
-   [string]$ChartTitle,
-
-   [Parameter(Mandatory=$False,Position=4)]
+   [Parameter(Mandatory=$False,Position=3)]
    [string]$Key,
 	
-   [Parameter(Mandatory=$False,Position=5)]
+   [Parameter(Mandatory=$False,Position=4)]
    [string]$FileGUID = "",
+
+
+   [Parameter(Mandatory=$False)]
+   [Decimal]$TSCOffset = 0,
 
    #[Parameter(Mandatory=$False,Position=5)]
    #[string]$WorkingDataDir = ".",
@@ -105,18 +78,27 @@ function CreateGP
     echo 'set tmargin 5' | Out-file $outfile -Encoding ascii -Append
 }
 
+$r = Test-WTCTDepedencies.ps1
+if($r -ne $True)
+{
+    echo $r[0]
+    echo "Setup reqruiemtns not met.  Please view the Readme.MD on https://github.com/Microsoft/Windows-Time-Calibration-Tools for more info."
+    return $False
+}
+
 # Setup directories
 $GraphDataDir = ".\GraphData"
 $GraphDataBackupDir = ".\GraphData\backup\"
 #$Server = $Name
 $WorkingDataDir = "."
+$ChartTitle = $Name
 
 if (-not (test-path $WorkingDataDir))  { md $WorkingDataDir }
 if (-not (test-path $GraphDataDir))  { md $GraphDataDir }
 if (-not (test-path $GraphDataBackupDir))  { md $GraphDataBackupDir }
 
-        $ServerWorkingDir = $WorkingDataDir + "\" + $Server
-        $ServerGrpahDir = $GraphDataDir + "\" + $Server
+    $ServerWorkingDir = $WorkingDataDir + "\" + $Server
+    $ServerGrpahDir = $GraphDataDir + "\" + $Server
 
     if($Key -ne "")
     {
@@ -125,6 +107,13 @@ if (-not (test-path $GraphDataBackupDir))  { md $GraphDataBackupDir }
     else
     {
         $ServerOut_IP = $ServerWorkingDir + $Name + ".out"
+    }
+
+    #Validation check of SUT machines files.
+    if (-not (test-path $ServerOut_IP))  
+    {
+        echo ("Missing .out data file(s) for System Under Test " + $Name) 
+        return $false
     }
 
     #$ServerOut_IP = $ServerWorkingDir + $Name + "_" + $Key + ".out"
@@ -152,9 +141,17 @@ if (-not (test-path $GraphDataBackupDir))  { md $GraphDataBackupDir }
         $localhostfile = $WorkingDataDir + "\" + $ReferenceClock + ".out";
     }
 
+    #Validation check of reference clock machine..
+    if (-not (test-path $localhostfile))  
+    {
+        echo ("Missing .out data file(s) for Reference clock " + $ReferenceClock) 
+        return $false
+    }
+
+
     #Created DIF file between localhost and entry using TimeSampleCorrelcation tool 
     DebugPrint("TimeSampleCorrelation DIF: " + $ServerOut_IP +  " " + $localhostfile + "  = " + $ServerDif_IP)
-    .\TimeSampleCorrelation.exe $ServerOut_IP $localhostfile 0 0 | MedianFilter.exe 2 60 | MedianFilter.exe 3 60 |
+    TimeSampleCorrelation.exe $ServerOut_IP $localhostfile $TSCOffset 0 | MedianFilter.exe 2 60 | MedianFilter.exe 3 60 |
         out-file $ServerDif_IP -Encoding ascii -Append 
 
     if((dir $ServerDif_IP).Length -gt 0)
@@ -199,4 +196,6 @@ if (-not (test-path $GraphDataBackupDir))  { md $GraphDataBackupDir }
 
         # Plot using Gnuplot, open source plotting project
         & gnuplot.exe $PlotGP_IP
+
+        Show-Percentiles.ps1 $ServerDif_IP
     }
