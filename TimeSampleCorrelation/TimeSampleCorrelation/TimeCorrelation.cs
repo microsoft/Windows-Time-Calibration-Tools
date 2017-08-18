@@ -71,8 +71,16 @@ namespace Microsoft.TimeCalibration.TimeSampleCorrelation
 
         /// <summary>
         /// Read a collection of samples from the source file. 
-        /// Samples are assumed to be in the format:
-        /// start_tsc, end_tsc, os time
+        /// Samples are assumed to be in one of these three formats and this explains how they are used.
+        /// Format 1: start_tsc, end_tsc, os time
+        ///  --> It is assumed that the OS time was collected when tsc = average of start_tsc and end_tsc. These two values should be very close anyway because getting the system time is a very quick function call.
+        /// Format 2: start_tsc, end_tsc, os time, ntpRTT, ntpTimeOffset
+        ///  --> This is the format written out by "w32tm /stripchart /rdtsc..." command. 
+        ///  --> It is assumed OS time is collected at tsc = start_tsc. The end_tsc value contains NTP noise and is ignored. Getting the system time is a very quick function call.
+        /// Format 3: start_tsc, os time
+        ///  --> It is assumed OS time is collected at tsc = start_tsc. Getting the system time is a very quick function call.
+        ///  --> This could be an output from a simple application that you write to sample TSC and OS Time.
+        /// 
         /// </summary>
         /// <param name="FileName">File containing samples</param>
         /// <param name="delta">TSC delta to apply</param>
@@ -87,21 +95,43 @@ namespace Microsoft.TimeCalibration.TimeSampleCorrelation
                 long tscStart;
                 long tscEnd;
                 string[] fields = timeStamps.ReadLine().Split(',');
-                if (fields.Length < 3)
+                if (fields.Length < 2)
+                {
+                    // No usable data
+                    continue;
+                }
+
+                int offset = 0;
+
+                if (!long.TryParse(fields[offset + StartingColumn], out tscStart))
                 {
                     continue;
                 }
-                if (!long.TryParse(fields[0 + StartingColumn], out tscStart))
+                offset++;
+                if (fields.Length == 2)
+                {
+                    // Format 3
+                    tscEnd = tscStart;
+                }
+                else
+                {
+                    // Format 1 or 2
+                    if (!long.TryParse(fields[offset + StartingColumn], out tscEnd))
+                    {
+                        continue;
+                    }
+                    offset++;
+                }
+
+                if (!long.TryParse(fields[offset + StartingColumn], out sample.timeStamp))
                 {
                     continue;
                 }
-                if (!long.TryParse(fields[1 + StartingColumn], out tscEnd))
+
+                if (fields.Length >= 5)
                 {
-                    continue;
-                }
-                if (!long.TryParse(fields[2 + StartingColumn], out sample.timeStamp))
-                {
-                    continue;
+                    // Format 2
+                    tscEnd = tscStart;
                 }
 
                 // Apply delta
@@ -112,7 +142,6 @@ namespace Microsoft.TimeCalibration.TimeSampleCorrelation
                 sample.tsc = (tscEnd + tscStart) / 2;
                 sample.tscStart = tscStart;
                 sample.tscEnd = tscEnd;
-
                 samples.Add(sample);
             }
             timeStamps.Close();
@@ -228,7 +257,7 @@ namespace Microsoft.TimeCalibration.TimeSampleCorrelation
             // Intropolate the guest timestamps to get the approximate value they would have had at root TSC
 
             // starting at sample 2, calculate the approximate guest time at rootSamples[i].
-            for (int i = 0; i < rootSamples.Length; i++)
+            for (int i = 2; i < rootSamples.Length; i++)
             {
                 // Gather a spread of 5 samples around the point to evaluate
                 double skew;
@@ -246,7 +275,7 @@ namespace Microsoft.TimeCalibration.TimeSampleCorrelation
                 // Interpolate the guest time at the root tsc timestamp.
                 skew = Interpolate(interopData, rootSamples[i].tsc) - rootSamples[i].timeStamp;
                 rtt = Interpolate(interopData, rootSamples[i].tscEnd) - Interpolate(interopData, rootSamples[i].tscStart);
-
+               
                 // Convert time stamp to human readable form.
                 DateTime date = DateTime.FromFileTime(rootSamples[i].timeStamp);
 
