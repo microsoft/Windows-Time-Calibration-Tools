@@ -36,6 +36,8 @@ The starting point data should be graphed.  Requires StopTime parameter.  The da
 .PARAMETER StopTime
 The stopping point data should be graphed.  Request the StartTime parameter.  The date is in the form: dd-MM-yyyy HH:mm:ss
 
+.PARAMETER NoFilter
+Instead of using the median filter, plot the raw data
 
 .NOTES
 GraphData and WorkingData directories are created and used for the data temp working space and the final charts as .png.
@@ -79,7 +81,10 @@ Param(
    [bool]$ShowWork,
 
    [Parameter(Mandatory=$False)]
-   [int]$ScaleFactor
+   [int]$ScaleFactor,
+
+   [Parameter(Mandatory=$False)]
+   [bool]$NoFilter
 )
 
 function DebugPrint
@@ -223,7 +228,8 @@ else
 
 DebugPrint("-----------------------------------")
 DebugPrint("List of Files:")
-DebugPrint($b | foreach { $b.FullName } )
+$b | foreach { DebugPrint($_.FullName) }
+#DebugPrint($b | foreach { ($_.FullName) } )
 
 echo ("Collecting Data") | Out-File $ErrorLog -Append
 #Figure out how many different GUIDs there are as data can't be processed over multiple GUIDs
@@ -354,9 +360,18 @@ foreach($Server in $slist)
             $localhostfile = $WorkingDataDir + "\" + $ReferenceClock + "_" + $FileGUID + ".out"
 
             #Created DIF file between localhost and entry using TimeSampleCorrelcation tool 
-            DebugPrint("TimeSampleCorrelation DIF: " + $ServerOut_IP +  " " + $localhostfile + "  = " + $ServerDif_IP)
-            TimeSampleCorrelation.exe $ServerOut_IP $localhostfile 0 1 | MedianFilter.exe 2 60 | MedianFilter.exe 3 60 |
-             out-file $ServerDif_IP -Encoding ascii -Append 
+            if($NoFilter)
+            {
+                DebugPrint("TimeSampleCorrelation DIF No Filter: " + $ServerOut_IP +  " " + $localhostfile + "  = " + $ServerDif_IP)
+                TimeSampleCorrelation.exe $ServerOut_IP $localhostfile 0 1 | MedianFilter.exe 2 60 | MedianFilter.exe 3 60 |
+                 out-file $ServerDif_IP -Encoding ascii -Append 
+            }
+            else
+            {
+                DebugPrint("TimeSampleCorrelation DIF Median Filter: " + $ServerOut_IP +  " " + $localhostfile + "  = " + $ServerDif_IP)
+                TimeSampleCorrelation.exe $ServerOut_IP $localhostfile 0 1 | MedianFilter.exe 2 60 | MedianFilter.exe 3 60 |
+                 out-file $ServerDif_IP -Encoding ascii -Append 
+            }
 
             if((dir $ServerDif_IP).Length -gt 0)
             {
@@ -369,7 +384,15 @@ foreach($Server in $slist)
                 $setoutput_cmd = "set output '" + $ServerPng_IP + "'"
                 echo $setoutput_cmd | Out-file $PlotGP_IP -Encoding ascii -Append
 
-                $settitle = "set title '" + $Server + " " + $_.ResovledName + " " + $_.SUTName + "' font 'Courier Bold, 35'"
+                if($NoFilter)
+                {
+                    $settitle = "set title '" + $Server + " " + $_.ResovledName + " " + $_.SUTName + " No Filter' font 'Courier Bold, 35'"
+                }
+                else
+                {
+                    $settitle = "set title '" + $Server + " " + $_.ResovledName + " " + $_.SUTName + " Median Filter' font 'Courier Bold, 35'"
+                }
+
                 echo $settitle | Out-file $PlotGP_IP -Encoding ascii -Append
 
                 # Change Y scale if provided
