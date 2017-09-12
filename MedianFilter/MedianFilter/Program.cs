@@ -35,16 +35,34 @@ namespace Microsoft.TimeCalibration.MedianFilter
                     break;
                 }
                 columns = line.Split(',');
-                value = double.Parse(columns[col]);
-                medianValues.Add(value);
-                while (medianValues.Count > depth)
+                if (columns.Length > col)
                 {
-                    medianValues.RemoveAt(0);
+                    try
+                    {
+                        value = double.Parse(columns[col]);
+                        medianValues.Add(value);
+                        while (medianValues.Count > depth)
+                        {
+                            medianValues.RemoveAt(0);
+                        }
+                        if (medianValues.Count == depth)
+                        {
+                            double median = GetMedianValue(medianValues);
+                            Console.WriteLine(line + "," + median);
+                        }
+                    }
+                    catch(Exception)
+                    {
+                        // In case of parsing or other exceptions, just output the original string.
+                        // This helps process and retain headers and such in input the data
+                        Console.WriteLine(line);
+                    }
                 }
-                if (medianValues.Count == depth)
+                else
                 {
-                    double median = GetMedianValue(medianValues);
-                    Console.WriteLine(line + "," + median);
+                    // Not enough columns in the current line.Just output the original string and move on.
+                    // This helps process and retain headers and such in input the data
+                    Console.WriteLine(line);
                 }
             }
         }

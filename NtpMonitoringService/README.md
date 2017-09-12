@@ -5,6 +5,7 @@
 * Create the service:
 	* sc create NtpMonitor binpath= c:\ntp\MonitoringService.exe start= auto
 * Create the registry keys or alternatively, use the Example.reg as a template.  From powershell you can us "ii .\Exmaple.reg" (Invoke-Item)
+
 	* HKLM\System\CurrentControlSet\Services\NtpMonitor\Config
 	 	* BasePath REG_SZ "C:\ntp\logs"
 	 	* BasePath REG_SZ "C:\ntp\resolverlogs"
