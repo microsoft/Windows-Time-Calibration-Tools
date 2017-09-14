@@ -219,8 +219,6 @@ else
             echo "Could not convert times"
             exit
         }
-
-
     }
 }
 
@@ -281,10 +279,6 @@ foreach($Server in $slist)
         echo $s | Out-File $ErrorLog -Append
         DebugPrint($s)
 
-        #$localhostfile = ($ServerWorkingDir + "\localhost") + ".out" #+ $fl.Name.Substring(1,35) + ".out"
-        #$ServerOut = ($WorkingDataDir + "\") + $Server #+ ".out" #+ dir gra
-
-
         # Clear out any old data for this server.
         if (Test-Path ($ServerWorkingDir + "*.*") ) { del ($ServerWorkingDir + "*.*") }
 
@@ -326,7 +320,6 @@ foreach($Server in $slist)
                 $AllGroups += $GroupSummary 
             }
 
-
             if($GroupedIP.Count -ne 0)
             {
                 DebugPrint("Groupings for " + $Server + " for file " + $_.Name)
@@ -338,10 +331,7 @@ foreach($Server in $slist)
        DebugPrint("All groups")
        DebugPrint($AllGroups | Select -Unique)
 
-        #if (Test-Path $ServerDif ) { del ($ServerDif + "*.*") }
-
-#        $GroupedIP | ForEach-Object {
-         $AllGroups | Select -Unique | ForEach-Object {
+       $AllGroups | Select -Unique | ForEach-Object {
             DebugPrint("Processing " + $_.SUTName + " " + $_.ResolvedName)
 
             #$SimpleIP = $_.IP.Replace(":","_")
@@ -352,8 +342,7 @@ foreach($Server in $slist)
             $PlotGP_IP = $ServerWorkingDir + $_.SUTName + ".gp"
             $ServerPng_IP = $ServerGrpahDir + $_.SUTName + ".png"
             $ServerPlotGNU_IP = $WorkingDataDir.Replace("\", "\\") + "\\" + $Server + $_.SUTName + "_plot.dif"
-            #$localhostfile = $WorkingDataDir + "\localhost_" + $FileGUID + ".out"
-            $localhostfile = $WorkingDataDir + "\" + $ReferenceClock + "_" + $FileGUID + ".out"
+            $localhostfile = $WorkingDataDir + "\REF_" + $ReferenceClock + "_" + $FileGUID + ".out"
 
             #Created DIF file between localhost and entry using TimeSampleCorrelcation tool 
             if($NoFilter)
