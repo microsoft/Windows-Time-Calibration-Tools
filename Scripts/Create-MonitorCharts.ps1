@@ -116,8 +116,6 @@ function CreateGP
 function SimplfyIP
 {
     Param ([string] $s)
-
-
 }
 
 $r = Test-WTCTDepedencies.ps1
@@ -229,7 +227,6 @@ else
 DebugPrint("-----------------------------------")
 DebugPrint("List of Files:")
 $b | foreach { DebugPrint($_.FullName) }
-#DebugPrint($b | foreach { ($_.FullName) } )
 
 echo ("Collecting Data") | Out-File $ErrorLog -Append
 #Figure out how many different GUIDs there are as data can't be processed over multiple GUIDs
@@ -254,8 +251,7 @@ if (Test-Path  ($WorkingDataDir + "\localhost*.*")) { del ($WorkingDataDir + "\l
 foreach($fl in $b)
 {
     $FileGUID = $fl.Name.Substring(1,35)
-    #$localhostfile = $WorkingDataDir + "\localhost_" + $FileGUID + ".out"
-    $localhostfile = $WorkingDataDir + "\" + $ReferenceClock + "_" + $FileGUID + ".out"
+    $localhostfile = $WorkingDataDir + "\REF_" + $ReferenceClock + "_" + $FileGUID + ".out"
     select-string $ReferenceClock $fl.FullName | select-string -NotMatch TSC_START | foreach {$_.Line} | out-file $localhostfile -Encoding ascii -Append
     $lhf = (Get-ChildItem $localhostfile)
     DebugPrint($lhf.Name + " Size = " + $lhf.Length)
