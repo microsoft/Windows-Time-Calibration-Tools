@@ -228,6 +228,7 @@ $b | foreach { DebugPrint($_.FullName) }
 
 echo ("Collecting Data") | Out-File $ErrorLog -Append
 #Figure out how many different GUIDs there are as data can't be processed over multiple GUIDs
+#Multiple GUIDs occur beacuse the service is restarted.
 $UniqueDataSets = [System.Array]@()
 foreach ($n in $b)
 {
@@ -273,8 +274,6 @@ foreach($Server in $slist)
         $ServerPng = $GraphDataDir + "\" + $Server + ".png"
         $PlotGP = $WorkingDataDir + "\" + $Server + ".gp"
     
-        #$ServerIP = $Server #+ "(" + $addr + ")"
-
         $s =  "Processing " + $Server + " for last " + $Days + " day(s)"
         echo $s | Out-File $ErrorLog -Append
         DebugPrint($s)
@@ -333,8 +332,6 @@ foreach($Server in $slist)
 
        $AllGroups | Select -Unique | ForEach-Object {
             DebugPrint("Processing " + $_.SUTName + " " + $_.ResolvedName)
-
-            #$SimpleIP = $_.IP.Replace(":","_")
 
             $ServerOut_IP = $ServerWorkingDir + $_.SUTName + "_" + $_.key + ".out"
             $ServerPlot_IP = $ServerWorkingDir + $_.SUTName + "_plot.dif"
