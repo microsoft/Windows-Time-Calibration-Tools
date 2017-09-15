@@ -128,11 +128,11 @@ namespace Microsoft.TimeCalibration.TimeSampleCorrelation
                     continue;
                 }
 
-                if (fields.Length >= 5)
+                /*if (fields.Length >= 5)
                 {
                     // Format 2
                     tscEnd = tscStart;
-                }
+                }*/
 
                 // Apply delta
                 tscStart -= delta;
