@@ -7,5 +7,6 @@
 *.db
 **/.vs
 **/Debug
+**/Release
 *.user
 
