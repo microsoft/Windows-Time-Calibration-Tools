@@ -128,11 +128,11 @@ namespace Microsoft.TimeCalibration.TimeSampleCorrelation
                     continue;
                 }
 
-                if (fields.Length >= 5)
+                /*if (fields.Length >= 5)
                 {
                     // Format 2
                     tscEnd = tscStart;
-                }
+                }*/
 
                 // Apply delta
                 tscStart -= delta;
@@ -223,6 +223,16 @@ namespace Microsoft.TimeCalibration.TimeSampleCorrelation
             return true;
         }
 
+        static Sample[] RebaseSamples(Sample[] Samples, long TscEpoch, long TimeStampEpoch)
+        {
+            return Samples.Select((sample) => new Sample() {
+                tsc = sample.tsc - TscEpoch,
+                tscStart = sample.tscStart - TscEpoch,
+                tscEnd = sample.tscEnd - TscEpoch,
+                timeStamp = sample.timeStamp - TimeStampEpoch
+            }).ToArray();
+        }
+
         /// <summary>
         /// Given two time samples, compute the clock skew.
         /// </summary>
@@ -239,6 +249,8 @@ namespace Microsoft.TimeCalibration.TimeSampleCorrelation
             // cast it to a long
             long detla = (long)ulong.Parse(args[2]);
             int startingColumn = 0;
+            long TscEpoch;
+            long TimeStampEpoch;
             if (args.Length > 3)
             {
                 startingColumn = int.Parse(args[3]);
@@ -246,6 +258,13 @@ namespace Microsoft.TimeCalibration.TimeSampleCorrelation
 
             Sample[] rootSamples = ReadSamples(args[0], 0, startingColumn).ToArray<Sample>();
             Sample[] guestSamples = ReadSamples(args[1], detla, startingColumn).ToArray<Sample>();
+
+            // Shift the samples epoch to avoid losing precision in the double
+            TscEpoch = Math.Min(rootSamples[0].tscStart, guestSamples[0].tscStart);
+            TimeStampEpoch = Math.Min(rootSamples[0].timeStamp, guestSamples[0].timeStamp);
+
+            rootSamples = RebaseSamples(rootSamples, TscEpoch, TimeStampEpoch);
+            guestSamples = RebaseSamples(guestSamples, TscEpoch, TimeStampEpoch);
             Point[] interopData = new Point[5];
 
             if ((rootSamples.Length == 0) || (guestSamples.Length == 0))
@@ -277,7 +296,7 @@ namespace Microsoft.TimeCalibration.TimeSampleCorrelation
                 rtt = Interpolate(interopData, rootSamples[i].tscEnd) - Interpolate(interopData, rootSamples[i].tscStart);
                
                 // Convert time stamp to human readable form.
-                DateTime date = DateTime.FromFileTime(rootSamples[i].timeStamp);
+                DateTime date = DateTime.FromFileTime(rootSamples[i].timeStamp + TimeStampEpoch);
 
                 // Print date, skew (in us units)
                 Console.Write(date.ToString() + ",");
