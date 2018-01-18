@@ -63,7 +63,7 @@ int main(int argc, char ** argv)
     if (!InstructionSet::TscInvariant())
     {
         printf("CPU doesn't support invariant TSC\n");
-        exit(-1);
+        //exit(-1);
     }
 
 	size_t sampleSize = atoll(argv[1]);
