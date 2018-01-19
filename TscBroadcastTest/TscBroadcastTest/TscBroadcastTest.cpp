@@ -1,4 +1,4 @@
-﻿// TscBroadcastTest.cpp : Defines the entry point for the console application.
+// TscBroadcastTest.cpp : Defines the entry point for the console application.
 //
 
 #include "stdafx.h"
