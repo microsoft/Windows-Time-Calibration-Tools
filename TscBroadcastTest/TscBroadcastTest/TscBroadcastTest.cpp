@@ -1,5 +1,5 @@
-// TscBroadcastTest.cpp : Defines the entry point for the console application.
-//
+// Simple tool to measure the TSC offset between two CPU cores.
+// Reports the offset as mean, median and stdev, along with the round trip time of the measure.
 
 #include "stdafx.h"
 #include <atomic>
@@ -43,6 +43,12 @@ void ComputeStats(std::vector<long long> Samples, long long & Mean, long long & 
 
 int main(int argc, char ** argv)
 {
+    if (argc != 4)
+    {
+        printf("Usage: %s cpu# cpu# iterations\n", argv[0]);
+        printf("Example: %s 0 1 1000000\n", argv[0]);
+        exit(-1);
+    }
     size_t serverCpuId = atoi(argv[1]);
     size_t clientCpuId = atoi(argv[2]);
     size_t samples = atoi(argv[3]);
@@ -54,6 +60,7 @@ int main(int argc, char ** argv)
     for (size_t i = 0; i < 10; i++)
     {
         clientOwns.store(false);
+        // Client and server are arbitrary
         auto client = std::thread([&tsClient, &clientOwns, samples, clientCpuId]() {
             SetThreadAffinity(clientCpuId);
             CollectSamples(clientOwns, true, tsClient);
@@ -70,6 +77,7 @@ int main(int argc, char ** argv)
         long long avgOffset = 0;
         for (size_t i = 0; i < samples - 1; i++)
         {
+            // If the TSC was synchronized, then tsClient[i] would be half way betweem tsServer[i] and tsServer[i+1]
             long long offset = (2 * (long long)tsClient[i] - (long long)tsServer[i] - (long long)tsServer[i + 1]) / 2;
             long long rtt = (long long)tsServer[i + 1] - (long long)tsServer[i];
             offsets.push_back(offset);
