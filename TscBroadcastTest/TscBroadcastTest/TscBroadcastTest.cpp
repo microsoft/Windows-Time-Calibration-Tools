@@ -78,8 +78,8 @@ int main(int argc, char ** argv)
 
         long long mean, median, stddev;
         ComputeStats(offsets, mean, median, stddev);
-        printf("%I64i\t%I64i\t%I64i\t", mean, median, stddev);
+        printf("%lld\t%lld\t%lld\t", mean, median, stddev);
         ComputeStats(rtts, mean, median, stddev);
-        printf("%I64i\t%I64i\t%I64i\n", mean, median, stddev);
+        printf("%lld\t%lld\t%lld\n", mean, median, stddev);
     }
 }
