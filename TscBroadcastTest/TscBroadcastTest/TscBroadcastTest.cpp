@@ -2,12 +2,10 @@
 //
 
 #include "stdafx.h"
-#include <intrin.h>
 #include <atomic>
 #include <thread>
 #include <vector>
 #include <algorithm>
-#include "platform.h"
 
 void CollectSamples(std::atomic<bool> & Signal, bool Client, std::vector<unsigned long long> & Samples)
 {
