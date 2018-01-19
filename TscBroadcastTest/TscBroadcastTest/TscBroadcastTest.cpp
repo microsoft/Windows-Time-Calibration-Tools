@@ -46,9 +46,9 @@ int main(int argc, char ** argv)
     size_t serverCpuId = atoi(argv[1]);
     size_t clientCpuId = atoi(argv[2]);
     size_t samples = atoi(argv[3]);
-    __declspec(align(64)) std::vector<unsigned long long> tsClient(samples);
-    __declspec(align(64))  std::vector<unsigned long long> tsServer(samples);
-    __declspec(align(64)) std::atomic<bool> clientOwns;
+    CACHE_ALIGN(std::vector<unsigned long long> tsClient(samples));
+    CACHE_ALIGN(std::vector<unsigned long long> tsServer(samples));
+    CACHE_ALIGN(std::atomic<bool> clientOwns);
     printf("O-Mean\tO-Med\tO-STDEV\tR-Mean\tR-Med\tR-STDEV\n");
     for (size_t i = 0; i < 10; i++)
     {

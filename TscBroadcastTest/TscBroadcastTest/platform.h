@@ -2,6 +2,9 @@
 #if defined(_MSC_VER)
 #include <windows.h>
 #include <intrin.h>
+#define CACHE_ALIGN(x) \
+__declspec(align(64)) x
+
 inline bool SetThreadAffinity(size_t CpuId)
 {
     DWORD_PTR affinityMask = 1ull << CpuId;
@@ -12,6 +15,10 @@ inline bool SetThreadAffinity(size_t CpuId)
     return true;
 }
 #else
+
+#define CACHE_ALIGN(x) \
+x __attribute((alligned(64)))
+
 #include <pthread.h>
 inline bool SetThreadAffinity(size_t CpuId)
 {
